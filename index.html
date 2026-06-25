@@ -1,3 +1,4 @@
+    
 <!doctype html>
 <html lang="en">
 <head>
@@ -286,6 +287,31 @@
     overflow: hidden;
   }
   .field.blurred { filter: blur(6px); opacity: 0.6; }
+
+  /* Plain divs never trigger a mobile on-screen keyboard, only real form
+     fields do. This input exists purely so tapping the test area can focus
+     a genuine <input>, which is what actually summons the keyboard on iOS
+     and Android. It's kept functionally invisible (zero size, no visual
+     chrome) but must stay focusable, so we avoid display:none / visibility
+     hidden — both of those also block focus and would defeat the purpose. */
+  .mobile-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: transparent;
+    caret-color: transparent;
+    font-size: 16px; /* iOS zooms in on focus if font-size < 16px */
+    opacity: 0.01;
+    pointer-events: none;
+    z-index: -1;
+  }
 
   .field .char {
     position: relative;
@@ -842,6 +868,18 @@
       </div>
 
       <div class="field" id="field" tabindex="0"></div>
+      <input
+        id="mobileInput"
+        class="mobile-input"
+        type="text"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        inputmode="text"
+        aria-hidden="true"
+        tabindex="-1"
+      />
     </div>
 
     <div class="restart-row" id="restartRow">
@@ -1128,6 +1166,7 @@
 
   // ---------------- DOM refs ----------------
   const field = document.getElementById('field');
+  const mobileInput = document.getElementById('mobileInput');
   const timerEl = document.getElementById('timer');
   const liveWpmEl = document.getElementById('liveWpm');
   const liveWpmVal = document.getElementById('liveWpmVal');
@@ -1805,7 +1844,7 @@
     saveJSON(SETTINGS_KEY, settings);
     applySettingsToUI();
     buildTest();
-    field.focus();
+    focusInput();
   });
 
   toggleNums.addEventListener('click', () => {
@@ -1813,7 +1852,7 @@
     saveJSON(SETTINGS_KEY, settings);
     applySettingsToUI();
     buildTest();
-    field.focus();
+    focusInput();
   });
 
   toggleSound.addEventListener('click', () => {
@@ -1821,7 +1860,7 @@
     saveJSON(SETTINGS_KEY, settings);
     applySettingsToUI();
     if (settings.sound) { ensureAudio(); playKeySound('key'); }
-    field.focus();
+    focusInput();
   });
 
   soundStyleEl.addEventListener('click', (e) => {
@@ -1832,7 +1871,7 @@
     applySettingsToUI();
     ensureAudio();
     playKeySound('key');
-    field.focus();
+    focusInput();
   });
 
   applySettingsToUI();
@@ -1847,11 +1886,11 @@
     state.mode = btn.dataset.mode;
     state.val = parseInt(btn.dataset.val, 10);
     buildTest();
-    field.focus();
+    focusInput();
   });
 
-  document.getElementById('restartBtn').addEventListener('click', () => { buildTest(); field.focus(); });
-  document.getElementById('nextBtn').addEventListener('click', () => { buildTest(); field.focus(); });
+  document.getElementById('restartBtn').addEventListener('click', () => { buildTest(); focusInput(); });
+  document.getElementById('nextBtn').addEventListener('click', () => { buildTest(); focusInput(); });
   document.getElementById('sameBtn').addEventListener('click', () => {
     // repeat same words
     state.text = state.words.join(' ');
@@ -1870,29 +1909,97 @@
     stage.style.display = 'flex';
     restartRow.classList.remove('hide');
     updateCaret(true);
-    field.focus();
+    focusInput();
   });
 
   // ---------------- input handling ----------------
-  field.addEventListener('keydown', handleKey);
+  // Plain divs can't summon a mobile on-screen keyboard — only real form
+  // fields can, so `mobileInput` is the actual focus/event target on every
+  // device. `field` stays focusable too (desktop click target, visual
+  // blur-state), but focusInput() is what we call everywhere we used to
+  // call field.focus(), since that's what actually opens the keyboard on
+  // phones.
+  //
+  // Deliberately routing ALL character entry through the `input` event
+  // (via e.inputType) rather than `keydown` on this hidden field. Mobile
+  // keyboards — predictive text, swipe typing, voice dictation, IMEs — are
+  // inconsistent about firing keydown for every character, but `input`
+  // always fires and tells us what actually changed. Using both `keydown`
+  // and `input` here would risk double-counting the same keystroke; using
+  // only `input` avoids that entirely. Physical keyboards also fire
+  // `input` for character entry (and for Backspace's deleteContentBackward
+  // inputType), so this single path covers both desktop and mobile.
+  const SEED = '\u200b'; // zero-width space, kept in mobileInput at all times
+  mobileInput.value = SEED;
+
+  function focusInput() {
+    field.focus({ preventScroll: true });
+    mobileInput.focus({ preventScroll: true });
+  }
+
+  function syntheticEvent(key) {
+    return { key, preventDefault() {}, ctrlKey: false, metaKey: false, altKey: false };
+  }
+
+  mobileInput.addEventListener('input', (e) => {
+    const val = mobileInput.value;
+
+    if (e.inputType && e.inputType.startsWith('delete')) {
+      // Any kind of deletion (backspace, delete-by-selection, etc.) — treat
+      // as a single backspace in our model, regardless of how much the
+      // native field actually erased.
+      mobileInput.value = SEED;
+      handleKey(syntheticEvent('Backspace'));
+      return;
+    }
+
+    if (val === SEED) return; // nothing actually added
+
+    const added = val.startsWith(SEED) ? val.slice(SEED.length) : val.replace(SEED, '');
+    mobileInput.value = SEED;
+    for (const ch of added) {
+      handleKey(syntheticEvent(ch));
+    }
+  });
+
+  // Escape still only makes sense from a physical keyboard (no virtual-
+  // keyboard equivalent), so keydown is the right event for it. Tab is
+  // intentionally NOT handled here — the global document-level keydown
+  // listener further down already owns Tab-to-restart, and handling it in
+  // both places would run buildTest() twice per press (this listener fires
+  // first as the event target, then bubbles to the document listener).
+  mobileInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') handleKey(e);
+  });
+
   field.addEventListener('blur', () => {
     if (!state.finished) field.classList.add('blurred');
   });
   field.addEventListener('focus', () => field.classList.remove('blurred'));
+  mobileInput.addEventListener('blur', () => {
+    if (!state.finished) field.classList.add('blurred');
+  });
+  mobileInput.addEventListener('focus', () => field.classList.remove('blurred'));
+
   document.addEventListener('click', (e) => {
-    if (!result.classList.contains('show')) field.focus();
+    if (result.classList.contains('show')) return;
+    // Don't steal focus when the user is interacting with controls (mode
+    // pills, toggles, perf page, etc.) — only refocus when they tap the
+    // typing area itself or elsewhere empty on the page.
+    if (e.target.closest('button, a, .perf-overlay, input')) return;
+    focusInput();
   });
 
   window.addEventListener('resize', () => { cachedLineHeight = null; updateCaret(true); });
 
   // global tab/escape capture even if focus elsewhere
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Tab') { e.preventDefault(); buildTest(); field.focus(); }
+    if (e.key === 'Tab') { e.preventDefault(); buildTest(); focusInput(); }
   });
 
   // ---------------- init ----------------
   buildTest();
-  field.focus();
+  focusInput();
 })();
 </script>
 </body>
