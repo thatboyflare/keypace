@@ -1,15 +1,32 @@
-    
+
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>keypace — typing speed test</title>
+<script>
+  // Set the theme attribute as early as possible, before CSS/paint, so
+  // there's no flash of the fallback theme on load for returning visitors.
+  (function () {
+    try {
+      var saved = localStorage.getItem('keypace_theme_v1');
+      document.documentElement.setAttribute('data-theme', saved || 'dusk');
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'dusk');
+    }
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
+    --radius: 10px;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    /* Fallback so there's no flash of unstyled content before JS sets
+       data-theme on <html> from the saved/default preference. */
     --bg: #1a1b26;
     --bg-soft: #20212f;
     --panel: #232436;
@@ -18,15 +35,146 @@
     --ink-dim: #565869;
     --ink-faint: #3a3c52;
     --accent: #e8b339;
+    --accent-hover: #f0c050;
     --accent-dim: #5b4a23;
+    --accent-glow: rgba(232, 179, 57, 0.5);
+    --accent-wash: rgba(232, 179, 57, 0.06);
     --error: #e3645a;
     --error-dim: #4a2c2a;
     --good: #6ec88f;
+  }
 
-    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
-    --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* ---------- themes ----------
+     Every visual color in the app reads from these custom properties, so a
+     theme is just a full swap of this variable set via [data-theme] on
+     <html>. The SVG charts (results screen, performance page) are drawn
+     with JS and can't reference CSS vars directly in their attributes, so
+     those read the *resolved* values via getComputedStyle at draw time
+     instead — see getThemeColor() in the script. */
+  html[data-theme="dusk"] {
+    --bg: #1a1b26;
+    --bg-soft: #20212f;
+    --panel: #232436;
+    --border: #2e3047;
+    --ink: #cdd1e0;
+    --ink-dim: #565869;
+    --ink-faint: #3a3c52;
+    --accent: #e8b339;
+    --accent-hover: #f0c050;
+    --accent-dim: #5b4a23;
+    --accent-glow: rgba(232, 179, 57, 0.5);
+    --accent-wash: rgba(232, 179, 57, 0.06);
+    --error: #e3645a;
+    --error-dim: #4a2c2a;
+    --good: #6ec88f;
+  }
 
-    --radius: 10px;
+  html[data-theme="nord"] {
+    --bg: #1c212b;
+    --bg-soft: #232934;
+    --panel: #272e3a;
+    --border: #353f4f;
+    --ink: #d6dde8;
+    --ink-dim: #5d6a80;
+    --ink-faint: #3a4456;
+    --accent: #7fb4d9;
+    --accent-hover: #93c1e0;
+    --accent-dim: #2f4658;
+    --accent-glow: rgba(127, 180, 217, 0.5);
+    --accent-wash: rgba(127, 180, 217, 0.06);
+    --error: #d4707a;
+    --error-dim: #4a2f33;
+    --good: #8fc7a8;
+  }
+
+  html[data-theme="forest"] {
+    --bg: #141c18;
+    --bg-soft: #1a241f;
+    --panel: #1f2b24;
+    --border: #2c3b32;
+    --ink: #cfe0d3;
+    --ink-dim: #5a7268;
+    --ink-faint: #354a3d;
+    --accent: #8bc78f;
+    --accent-hover: #9fd4a2;
+    --accent-dim: #34492f;
+    --accent-glow: rgba(139, 199, 143, 0.5);
+    --accent-wash: rgba(139, 199, 143, 0.06);
+    --error: #d4807a;
+    --error-dim: #4a322f;
+    --good: #a8d4a0;
+  }
+
+  html[data-theme="rosepine"] {
+    --bg: #1f1a24;
+    --bg-soft: #26202c;
+    --panel: #2b2433;
+    --border: #3c3242;
+    --ink: #e2d9e8;
+    --ink-dim: #6e6078;
+    --ink-faint: #443a4d;
+    --accent: #d894a8;
+    --accent-hover: #e1a5b8;
+    --accent-dim: #4f2f3a;
+    --accent-glow: rgba(216, 148, 168, 0.5);
+    --accent-wash: rgba(216, 148, 168, 0.06);
+    --error: #e0838a;
+    --error-dim: #4a2f33;
+    --good: #b3a0d4;
+  }
+
+  html[data-theme="mono"] {
+    --bg: #161616;
+    --bg-soft: #1d1d1d;
+    --panel: #222222;
+    --border: #333333;
+    --ink: #e8e8e8;
+    --ink-dim: #6b6b6b;
+    --ink-faint: #3d3d3d;
+    --accent: #f2f2f2;
+    --accent-hover: #ffffff;
+    --accent-dim: #4a4a4a;
+    --accent-glow: rgba(242, 242, 242, 0.5);
+    --accent-wash: rgba(242, 242, 242, 0.06);
+    --error: #d96c6c;
+    --error-dim: #4a3030;
+    --good: #a0a0a0;
+  }
+
+  html[data-theme="sunset"] {
+    --bg: #1c1412;
+    --bg-soft: #241a17;
+    --panel: #2b1f1b;
+    --border: #3d2c25;
+    --ink: #f0ddd2;
+    --ink-dim: #7d5d4f;
+    --ink-faint: #4a352c;
+    --accent: #e8845c;
+    --accent-hover: #f0966f;
+    --accent-dim: #5c3823;
+    --accent-glow: rgba(232, 132, 92, 0.5);
+    --accent-wash: rgba(232, 132, 92, 0.06);
+    --error: #d4636e;
+    --error-dim: #4a2c30;
+    --good: #d9a25c;
+  }
+
+  html[data-theme="paper"] {
+    --bg: #f4f1ea;
+    --bg-soft: #ebe7dc;
+    --panel: #fdfcf8;
+    --border: #ddd6c7;
+    --ink: #2b2620;
+    --ink-dim: #8c8270;
+    --ink-faint: #c9c1ae;
+    --accent: #c2762f;
+    --accent-hover: #a9621f;
+    --accent-dim: #ead9bd;
+    --accent-glow: rgba(194, 118, 47, 0.35);
+    --accent-wash: rgba(194, 118, 47, 0.08);
+    --error: #b8473f;
+    --error-dim: #f0d9d6;
+    --good: #5c8a5c;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -51,7 +199,7 @@
     position: fixed;
     inset: 0;
     background:
-      radial-gradient(ellipse 800px 500px at 50% -10%, rgba(232,179,57,0.05), transparent 60%);
+      radial-gradient(ellipse 800px 500px at 50% -10%, var(--accent-wash), transparent 60%);
     pointer-events: none;
     z-index: 0;
   }
@@ -94,6 +242,84 @@
     align-items: center;
     gap: 8px;
   }
+
+  /* ---------- theme picker ---------- */
+  .theme-picker-wrap {
+    position: relative;
+  }
+
+  .theme-panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 230px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+    z-index: 40;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  .theme-panel.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  .theme-panel-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    font-weight: 600;
+    margin-bottom: 10px;
+    padding: 0 2px;
+  }
+
+  .theme-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 7px;
+  }
+
+  .theme-swatch {
+    appearance: none;
+    border: 1.5px solid var(--border);
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 9px 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    align-items: flex-start;
+    transition: border-color 0.15s ease, transform 0.1s ease;
+  }
+  .theme-swatch:hover { border-color: var(--ink-faint); }
+  .theme-swatch:active { transform: scale(0.97); }
+  .theme-swatch.active { border-color: var(--accent); }
+
+  .theme-swatch .ts-dots {
+    display: flex;
+    gap: 4px;
+  }
+  .theme-swatch .ts-dot {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.15);
+  }
+  .theme-swatch .ts-name {
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink-dim);
+  }
+  .theme-swatch.active .ts-name { color: var(--ink); }
 
   nav.modes {
     display: flex;
@@ -165,8 +391,8 @@
     background: var(--ink-faint);
     transition: background 0.15s ease, box-shadow 0.15s ease;
   }
-  .toggle-btn.active { color: var(--accent); border-color: var(--accent-dim); background: rgba(232,179,57,0.06); }
-  .toggle-btn.active .tdot { background: var(--accent); box-shadow: 0 0 6px rgba(232,179,57,0.6); }
+  .toggle-btn.active { color: var(--accent); border-color: var(--accent-dim); background: var(--accent-wash); }
+  .toggle-btn.active .tdot { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
 
   .toggles-sep {
     width: 1px;
@@ -340,7 +566,7 @@
     border-radius: 2px;
     top: 0.18em;
     left: 0;
-    box-shadow: 0 0 12px rgba(232,179,57,0.5);
+    box-shadow: 0 0 12px var(--accent-glow);
     will-change: transform;
     transform: translate3d(0,0,0);
     transition: opacity 0.18s ease;
@@ -511,7 +737,7 @@
     color: var(--bg);
     border-color: var(--accent);
   }
-  .btn.primary:hover { background: #f0c050; }
+  .btn.primary:hover { background: var(--accent-hover); }
 
   /* ---------- redo button below test ---------- */
   .history-strip {
@@ -780,10 +1006,10 @@
   .perf-table tbody td {
     padding: 9px 14px;
     color: var(--ink-dim);
-    border-bottom: 1px solid rgba(255,255,255,0.04);
+    border-bottom: 1px solid var(--border);
   }
   .perf-table tbody tr:last-child td { border-bottom: none; }
-  .perf-table tbody tr:hover td { background: rgba(255,255,255,0.02); }
+  .perf-table tbody tr:hover td { background: var(--bg-soft); }
   .perf-table .cell-wpm { color: var(--ink); font-weight: 600; }
   .perf-table .cell-best { color: var(--accent); font-weight: 700; }
   .perf-table .cell-mode { color: var(--ink-faint); }
@@ -809,6 +1035,7 @@
     .perf-bests { grid-template-columns: repeat(2, 1fr); }
     .perf-table thead th, .perf-table tbody td { padding: 8px 9px; font-size: 11.5px; }
     .perf-table thead th:nth-child(6), .perf-table tbody td:nth-child(6) { display: none; }
+    .theme-panel { width: 200px; right: -40px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -835,6 +1062,15 @@
       <button class="icon-btn" id="perfBtn" title="Performance history" aria-label="Performance history">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
       </button>
+      <div class="theme-picker-wrap">
+        <button class="icon-btn" id="themeBtn" title="Color theme" aria-label="Color theme">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C22 6.012 17.461 2 12 2z"></path></svg>
+        </button>
+        <div class="theme-panel" id="themePanel">
+          <div class="theme-panel-title">theme</div>
+          <div class="theme-grid" id="themeGrid"></div>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -1247,6 +1483,26 @@
     return field.querySelectorAll('.char');
   }
 
+  // SVG attributes (stroke/fill) can't reference CSS custom properties
+  // directly the way CSS rules can, so the JS-drawn charts read the
+  // *resolved* value of each theme variable at draw time instead. This is
+  // what makes the results-screen chart and performance-page chart follow
+  // whichever theme is currently active rather than being stuck on one
+  // hardcoded palette.
+  function themeVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function hexToRgba(hex, alpha) {
+    const h = hex.replace('#', '');
+    const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+    const r = parseInt(full.slice(0, 2), 16);
+    const g = parseInt(full.slice(2, 4), 16);
+    const b = parseInt(full.slice(4, 6), 16);
+    if ([r, g, b].some(Number.isNaN)) return `rgba(0,0,0,${alpha})`; // safe fallback
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
   let cachedLineHeight = null;
   function getLineHeight() {
     if (cachedLineHeight) return cachedLineHeight;
@@ -1648,6 +1904,8 @@
     const W = 900, H = 220, PAD = 10;
     const n = points.length;
     const maxWpm = Math.max(10, ...points.map(p => p.wpm)) * 1.15;
+    const inkFaint = themeVar('--ink-faint');
+    const accent = themeVar('--accent');
 
     const xFor = (i) => PAD + (i / (n - 1)) * (W - PAD * 2);
     const yFor = (v) => H - PAD - (v / maxWpm) * (H - PAD * 2);
@@ -1657,7 +1915,7 @@
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       line.setAttribute('x1', PAD); line.setAttribute('x2', W - PAD);
       line.setAttribute('y1', y); line.setAttribute('y2', y);
-      line.setAttribute('stroke', 'rgba(255,255,255,0.05)');
+      line.setAttribute('stroke', hexToRgba(inkFaint, 0.18));
       line.setAttribute('stroke-width', '1');
       svg.appendChild(line);
     }
@@ -1667,13 +1925,13 @@
 
     const area = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     area.setAttribute('d', areaPath);
-    area.setAttribute('fill', 'rgba(232,179,57,0.08)');
+    area.setAttribute('fill', hexToRgba(accent, 0.08));
     svg.appendChild(area);
 
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', linePath);
     path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', '#e8b339');
+    path.setAttribute('stroke', accent);
     path.setAttribute('stroke-width', '2.5');
     path.setAttribute('stroke-linecap', 'round');
     path.setAttribute('stroke-linejoin', 'round');
@@ -1683,7 +1941,7 @@
       const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       c.setAttribute('cx', xFor(i)); c.setAttribute('cy', yFor(p.wpm));
       c.setAttribute('r', n > 40 ? 0 : 3);
-      c.setAttribute('fill', '#e8b339');
+      c.setAttribute('fill', accent);
       const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
       title.textContent = p.wpm + ' wpm · ' + formatDate(p.date);
       c.appendChild(title);
@@ -1772,6 +2030,9 @@
     const maxWpm = Math.max(10, ...hist.map(h => Math.max(h.wpm, h.raw))) * 1.15;
     const n = hist.length;
 
+    const inkFaint = themeVar('--ink-faint');
+    const accent = themeVar('--accent');
+
     const xFor = (i) => n <= 1 ? PAD : PAD + (i / (n - 1)) * (W - PAD * 2);
     const yFor = (v) => H - PAD - (v / maxWpm) * (H - PAD * 2);
 
@@ -1782,7 +2043,7 @@
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       line.setAttribute('x1', PAD); line.setAttribute('x2', W - PAD);
       line.setAttribute('y1', y); line.setAttribute('y2', y);
-      line.setAttribute('stroke', 'rgba(255,255,255,0.05)');
+      line.setAttribute('stroke', hexToRgba(inkFaint, 0.18));
       line.setAttribute('stroke-width', '1');
       svg.appendChild(line);
     }
@@ -1795,7 +2056,7 @@
     const rawPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     rawPath.setAttribute('d', pathFor('raw'));
     rawPath.setAttribute('fill', 'none');
-    rawPath.setAttribute('stroke', '#3a3c52');
+    rawPath.setAttribute('stroke', inkFaint);
     rawPath.setAttribute('stroke-width', '1.5');
     rawPath.setAttribute('stroke-dasharray', '3,3');
     svg.appendChild(rawPath);
@@ -1804,14 +2065,14 @@
     const areaPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     const d = pathFor('wpm') + ` L ${xFor(n-1)} ${H-PAD} L ${xFor(0)} ${H-PAD} Z`;
     areaPath.setAttribute('d', d);
-    areaPath.setAttribute('fill', 'rgba(232,179,57,0.08)');
+    areaPath.setAttribute('fill', hexToRgba(accent, 0.08));
     svg.appendChild(areaPath);
 
     // wpm line
     const wpmPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     wpmPath.setAttribute('d', pathFor('wpm'));
     wpmPath.setAttribute('fill', 'none');
-    wpmPath.setAttribute('stroke', '#e8b339');
+    wpmPath.setAttribute('stroke', accent);
     wpmPath.setAttribute('stroke-width', '2.5');
     wpmPath.setAttribute('stroke-linecap', 'round');
     wpmPath.setAttribute('stroke-linejoin', 'round');
@@ -1821,12 +2082,92 @@
       const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       c.setAttribute('cx', xFor(i)); c.setAttribute('cy', yFor(h.wpm));
       c.setAttribute('r', n > 30 ? 0 : 2.5);
-      c.setAttribute('fill', '#e8b339');
+      c.setAttribute('fill', accent);
       svg.appendChild(c);
     });
   }
 
-  // ---------------- toggles: punctuation / numbers / sound ----------------
+  // ---------------- theme picker ----------------
+  const THEMES = [
+    { id: 'dusk', label: 'Amber Dusk', dots: ['#1a1b26', '#e8b339', '#cdd1e0'] },
+    { id: 'nord', label: 'Nord', dots: ['#1c212b', '#7fb4d9', '#d6dde8'] },
+    { id: 'forest', label: 'Forest', dots: ['#141c18', '#8bc78f', '#cfe0d3'] },
+    { id: 'rosepine', label: 'Rosé Pine', dots: ['#1f1a24', '#d894a8', '#e2d9e8'] },
+    { id: 'mono', label: 'Mono', dots: ['#161616', '#f2f2f2', '#e8e8e8'] },
+    { id: 'sunset', label: 'Sunset', dots: ['#1c1412', '#e8845c', '#f0ddd2'] },
+    { id: 'paper', label: 'Paper', dots: ['#f4f1ea', '#c2762f', '#2b2620'] },
+  ];
+  const THEME_KEY = 'keypace_theme_v1';
+
+  function getCurrentTheme() {
+    return document.documentElement.getAttribute('data-theme') || 'dusk';
+  }
+
+  function applyTheme(id, opts) {
+    document.documentElement.setAttribute('data-theme', id);
+    try { localStorage.setItem(THEME_KEY, id); } catch (e) { /* storage unavailable */ }
+    renderThemeGrid();
+    // SVG chart colors are resolved to concrete hex values at draw time
+    // (see themeVar/hexToRgba), so switching themes needs an explicit
+    // redraw — a plain CSS variable change won't touch attributes already
+    // written onto existing <path>/<circle> elements.
+    if (!opts || !opts.skipRedraw) {
+      if (result.classList.contains('show')) drawChart();
+      if (perfOverlay.classList.contains('show')) renderPerfChart();
+    }
+  }
+
+  function renderThemeGrid() {
+    const grid = document.getElementById('themeGrid');
+    const current = getCurrentTheme();
+    grid.innerHTML = '';
+    THEMES.forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = 'theme-swatch' + (t.id === current ? ' active' : '');
+      btn.dataset.theme = t.id;
+      btn.innerHTML = `
+        <span class="ts-dots">
+          ${t.dots.map(c => `<span class="ts-dot" style="background:${c}"></span>`).join('')}
+        </span>
+        <span class="ts-name">${t.label}</span>
+      `;
+      grid.appendChild(btn);
+    });
+  }
+
+  const themeBtn = document.getElementById('themeBtn');
+  const themePanel = document.getElementById('themePanel');
+
+  function openThemePanel() {
+    renderThemeGrid();
+    themePanel.classList.add('show');
+  }
+  function closeThemePanel() { themePanel.classList.remove('show'); }
+
+  themeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    themePanel.classList.contains('show') ? closeThemePanel() : openThemePanel();
+  });
+
+  document.getElementById('themeGrid').addEventListener('click', (e) => {
+    const btn = e.target.closest('.theme-swatch');
+    if (!btn) return;
+    applyTheme(btn.dataset.theme);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!themePanel.classList.contains('show')) return;
+    if (e.target.closest('.theme-picker-wrap')) return;
+    closeThemePanel();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && themePanel.classList.contains('show')) closeThemePanel();
+  });
+
+  // data-theme was already set synchronously in <head> before paint; just
+  // sync the grid's active state to whatever that resolved to.
+  renderThemeGrid();
+
   function applySettingsToUI() {
     togglePunct.classList.toggle('active', settings.punctuation);
     toggleNums.classList.toggle('active', settings.numbers);
@@ -1986,7 +2327,7 @@
     // Don't steal focus when the user is interacting with controls (mode
     // pills, toggles, perf page, etc.) — only refocus when they tap the
     // typing area itself or elsewhere empty on the page.
-    if (e.target.closest('button, a, .perf-overlay, input')) return;
+    if (e.target.closest('button, a, .perf-overlay, input, .theme-picker-wrap')) return;
     focusInput();
   });
 
