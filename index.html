@@ -542,20 +542,22 @@
   .field .char {
     position: relative;
     color: var(--ink-faint);
-    transition: color 0.1s ease;
+    transition: color 0.06s linear;
   }
-  .field .char.correct { color: var(--ink); animation: charpop 0.18s ease-out; }
-  .field .char.incorrect { color: var(--error); text-decoration: underline; text-decoration-color: var(--error-dim); text-decoration-thickness: 2px; animation: charpop 0.18s ease-out; }
+  .field .char.correct { color: var(--ink); animation: charpop 0.1s ease-out; }
+  .field .char.incorrect { color: var(--error); text-decoration: underline; text-decoration-color: var(--error-dim); text-decoration-thickness: 2px; animation: charpop 0.1s ease-out; }
   .field .char.extra { color: var(--error-dim); }
   .field .char.current { color: var(--ink); }
 
-  /* Inline elements ignore transform/scale, so the keystroke "pop" is done
-     with a brief text-shadow glow instead — gives tactile feedback on each
-     character without switching to inline-block (which previously broke
-     letter spacing and word gaps across the whole test). */
+  /* Inline elements ignore transform/scale, so the original "pop" used
+     text-shadow instead — but text-shadow isn't GPU-compositable, so the
+     browser had to repaint (not just composite) the character on every
+     frame of the animation, on every single keystroke. opacity IS
+     compositable even on inline elements, so this gives the same tactile
+     flash with none of that repaint cost. */
   @keyframes charpop {
-    0% { text-shadow: 0 0 6px currentColor; }
-    100% { text-shadow: 0 0 0 transparent; }
+    0% { opacity: 0.45; }
+    100% { opacity: 1; }
   }
 
   .caret {
@@ -1314,6 +1316,25 @@
     return audioCtx;
   }
 
+  // The 'mech' sound style needs a short burst of white noise. Previously
+  // this buffer was rebuilt from scratch — allocating a new buffer and
+  // running a Math.random() fill loop on the main thread — on every single
+  // keystroke, directly competing with the same frame budget as typing
+  // responsiveness. The waveform doesn't need to be unique each time to
+  // sound convincing, so it's generated once and reused for every
+  // keystroke afterward.
+  let mechNoiseBuffer = null;
+  function getMechNoiseBuffer(ctx) {
+    if (mechNoiseBuffer && mechNoiseBuffer._ctx === ctx) return mechNoiseBuffer;
+    const bufSize = Math.floor(ctx.sampleRate * 0.02);
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+    buf._ctx = ctx;
+    mechNoiseBuffer = buf;
+    return buf;
+  }
+
   function playKeySound(kind) {
     if (!settings.sound) return;
     const ctx = ensureAudio();
@@ -1337,12 +1358,8 @@
 
     if (style === 'mech') {
       // click (noise burst) + short tonal thock
-      const bufSize = Math.floor(ctx.sampleRate * 0.02);
-      const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
       const noise = ctx.createBufferSource();
-      noise.buffer = buf;
+      noise.buffer = getMechNoiseBuffer(ctx);
       const noiseGain = ctx.createGain();
       noiseGain.gain.setValueAtTime(0.06, t0);
       noiseGain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.02);
@@ -1462,8 +1479,11 @@
   }
 
   // ---------------- render ----------------
+  let cachedSpans = [];
+
   function renderField() {
     const frag = document.createDocumentFragment();
+    cachedSpans = new Array(state.chars.length);
     state.chars.forEach((c, i) => {
       const span = document.createElement('span');
       span.className = 'char';
@@ -1471,6 +1491,7 @@
       span.textContent = c.char;
       span.dataset.i = i;
       frag.appendChild(span);
+      cachedSpans[i] = span;
     });
     field.innerHTML = '';
     field.appendChild(frag);
@@ -1479,8 +1500,12 @@
     field.appendChild(caretEl);
   }
 
+  // Previously re-ran field.querySelectorAll('.char') on every call — a
+  // full DOM scan of the whole field, several times per keystroke. Spans
+  // only ever change when renderField() rebuilds the DOM, so caching the
+  // array there and returning it directly here removes that cost entirely.
   function charSpans() {
-    return field.querySelectorAll('.char');
+    return cachedSpans;
   }
 
   // SVG attributes (stroke/fill) can't reference CSS custom properties
@@ -1594,7 +1619,19 @@
     const useInstant = instant || lineChanged;
     lastCaretLine = lineIdx;
 
-    caretEl.style.transition = useInstant ? 'none' : 'transform 0.075s cubic-bezier(.16,.84,.32,1)';
+    // The previous ease-out curve decelerated hard into every single
+    // character — fast start, hard stop. Each individual move looked fine,
+    // but typing is a constant stream of these moves, and a hard
+    // decelerate-to-zero-velocity at every letter is exactly what reads as
+    // discrete/robotic rather than fluid: the caret visibly "thuds" to a
+    // stop, then snaps to full speed again for the next jump. A linear
+    // (constant-velocity) glide has no landing deceleration to interrupt,
+    // so when the next keystroke arrives before the current move finishes
+    // — which is the normal case at real typing speed — the caret just
+    // smoothly redirects instead of visibly catching itself mid-stop. This
+    // is what actually produces a continuous-feeling glide instead of a
+    // sequence of separate hops.
+    caretEl.style.transition = useInstant ? 'none' : 'transform 0.045s linear';
     caretEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
     caretEl.classList.remove('blink');
     if (useInstant) {
@@ -1745,19 +1782,31 @@
   }
 
   function extendTimeText() {
-    // extend with more words seamlessly. state.chars[i].status already
-    // holds every character's correct/incorrect/pending state, and
-    // renderField() reads that status when it rebuilds the DOM — so no
-    // separate re-coloring pass is needed (a previous version re-derived
-    // status from state.typed here, which incorrectly re-colored skipped
-    // words as correct, since state.typed stores the actual target letters
-    // for skipped words, not what the user typed).
+    // Append new words to the live DOM instead of calling renderField()
+    // (which would destroy and recreate every span already on screen,
+    // including hundreds of already-typed/colored characters, just to add
+    // ~60 more words at the end). That full rebuild was happening
+    // periodically mid-test and was a real, visible stutter — this path
+    // only ever adds new nodes, never touches existing ones.
     const more = genWords(60, { punctuation: settings.punctuation, numbers: settings.numbers });
     state.words = state.words.concat(more);
     const newText = ' ' + more.join(' ');
     state.text += newText;
-    newText.split('').forEach(c => state.chars.push({ char: c, status: 'pending' }));
-    renderField();
+
+    const startIdx = state.chars.length;
+    const frag = document.createDocumentFragment();
+    newText.split('').forEach((c, j) => {
+      state.chars.push({ char: c, status: 'pending' });
+      const span = document.createElement('span');
+      span.className = 'char';
+      span.textContent = c;
+      span.dataset.i = startIdx + j;
+      frag.appendChild(span);
+      cachedSpans[startIdx + j] = span;
+    });
+    // caretEl must stay the LAST child of field for rendering order, so
+    // insert the new spans just before it rather than appending after.
+    field.insertBefore(frag, caretEl);
     updateCaret(true);
   }
 
