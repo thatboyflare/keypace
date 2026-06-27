@@ -6,20 +6,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>keypace — typing speed test</title>
 <script>
-  // Set the theme attribute as early as possible, before CSS/paint, so
-  // there's no flash of the fallback theme on load for returning visitors.
+  // Set theme + font attributes as early as possible, before CSS/paint, so
+  // there's no flash of the fallback look on load for returning visitors.
   (function () {
     try {
-      var saved = localStorage.getItem('keypace_theme_v1');
-      document.documentElement.setAttribute('data-theme', saved || 'dusk');
+      var savedTheme = localStorage.getItem('keypace_theme_v1');
+      document.documentElement.setAttribute('data-theme', savedTheme || 'dusk');
     } catch (e) {
       document.documentElement.setAttribute('data-theme', 'dusk');
+    }
+    try {
+      var savedFont = localStorage.getItem('keypace_font_v1');
+      document.documentElement.setAttribute('data-font', savedFont || 'jetbrains');
+    } catch (e) {
+      document.documentElement.setAttribute('data-font', 'jetbrains');
     }
   })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Source+Code+Pro:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --radius: 10px;
@@ -177,6 +183,18 @@
     --good: #5c8a5c;
   }
 
+  /* ---------- fonts ----------
+     Only --font-mono (the typing text itself) changes per selection —
+     --font-ui stays Inter throughout, since the chrome/labels/buttons
+     aren't part of what's being tested or compared between fonts. */
+  html[data-font="jetbrains"] { --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace; }
+  html[data-font="firacode"] { --font-mono: 'Fira Code', 'SF Mono', Consolas, monospace; }
+  html[data-font="ibmplex"] { --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace; }
+  html[data-font="spacemono"] { --font-mono: 'Space Mono', 'SF Mono', Consolas, monospace; }
+  html[data-font="sourcecodepro"] { --font-mono: 'Source Code Pro', 'SF Mono', Consolas, monospace; }
+  html[data-font="robotomono"] { --font-mono: 'Roboto Mono', 'SF Mono', Consolas, monospace; }
+  html[data-font="courierprime"] { --font-mono: 'Courier Prime', 'Courier New', monospace; }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   html, body {
@@ -320,6 +338,48 @@
     color: var(--ink-dim);
   }
   .theme-swatch.active .ts-name { color: var(--ink); }
+
+  .font-panel { width: 200px; }
+
+  .font-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .font-option {
+    appearance: none;
+    border: 1.5px solid transparent;
+    background: transparent;
+    border-radius: 7px;
+    padding: 9px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    width: 100%;
+    text-align: left;
+  }
+  .font-option:hover { background: var(--panel); }
+  .font-option.active { border-color: var(--accent-dim); background: var(--panel); }
+
+  .font-option .fo-preview {
+    font-size: 14.5px;
+    color: var(--ink-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .font-option.active .fo-preview { color: var(--accent); }
+
+  .font-option .fo-check {
+    color: var(--accent);
+    flex-shrink: 0;
+    opacity: 0;
+  }
+  .font-option.active .fo-check { opacity: 1; }
 
   nav.modes {
     display: flex;
@@ -1038,6 +1098,7 @@
     .perf-table thead th, .perf-table tbody td { padding: 8px 9px; font-size: 11.5px; }
     .perf-table thead th:nth-child(6), .perf-table tbody td:nth-child(6) { display: none; }
     .theme-panel { width: 200px; right: -40px; }
+    .font-panel { width: 180px; right: -40px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1071,6 +1132,15 @@
         <div class="theme-panel" id="themePanel">
           <div class="theme-panel-title">theme</div>
           <div class="theme-grid" id="themeGrid"></div>
+        </div>
+      </div>
+      <div class="theme-picker-wrap">
+        <button class="icon-btn" id="fontBtn" title="Typing font" aria-label="Typing font">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
+        </button>
+        <div class="theme-panel font-panel" id="fontPanel">
+          <div class="theme-panel-title">font</div>
+          <div class="font-list" id="fontList"></div>
         </div>
       </div>
     </div>
@@ -2195,6 +2265,7 @@
 
   themeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    closeFontPanel();
     themePanel.classList.contains('show') ? closeThemePanel() : openThemePanel();
   });
 
@@ -2216,6 +2287,93 @@
   // data-theme was already set synchronously in <head> before paint; just
   // sync the grid's active state to whatever that resolved to.
   renderThemeGrid();
+
+  // ---------------- font picker ----------------
+  const FONTS = [
+    { id: 'jetbrains', label: 'JetBrains Mono', family: "'JetBrains Mono', monospace" },
+    { id: 'firacode', label: 'Fira Code', family: "'Fira Code', monospace" },
+    { id: 'ibmplex', label: 'IBM Plex Mono', family: "'IBM Plex Mono', monospace" },
+    { id: 'spacemono', label: 'Space Mono', family: "'Space Mono', monospace" },
+    { id: 'sourcecodepro', label: 'Source Code Pro', family: "'Source Code Pro', monospace" },
+    { id: 'robotomono', label: 'Roboto Mono', family: "'Roboto Mono', monospace" },
+    { id: 'courierprime', label: 'Courier Prime', family: "'Courier Prime', monospace" },
+  ];
+  const FONT_KEY = 'keypace_font_v1';
+
+  function getCurrentFont() {
+    return document.documentElement.getAttribute('data-font') || 'jetbrains';
+  }
+
+  function applyFont(id) {
+    document.documentElement.setAttribute('data-font', id);
+    try { localStorage.setItem(FONT_KEY, id); } catch (e) { /* storage unavailable */ }
+    renderFontList();
+    // Different monospace fonts have different character widths, so the
+    // cached line-height (and every span position the caret depends on)
+    // is stale the instant the font changes — same situation as a resize.
+    cachedLineHeight = null;
+    updateCaret(true);
+    // All font files are requested upfront in <head>, so this is normally
+    // already a no-op — but if the chosen font was still downloading at
+    // the moment of switching, the measurement above could have run
+    // against the fallback font. document.fonts.ready resolves once every
+    // requested font has actually finished loading, so this re-syncs the
+    // caret/line-height if that swap happens after the fact.
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        cachedLineHeight = null;
+        updateCaret(true);
+      });
+    }
+  }
+
+  function renderFontList() {
+    const list = document.getElementById('fontList');
+    const current = getCurrentFont();
+    list.innerHTML = '';
+    FONTS.forEach(f => {
+      const btn = document.createElement('button');
+      btn.className = 'font-option' + (f.id === current ? ' active' : '');
+      btn.dataset.font = f.id;
+      btn.innerHTML = `
+        <span class="fo-preview" style="font-family:${f.family}">${f.label}</span>
+        <svg class="fo-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      `;
+      list.appendChild(btn);
+    });
+  }
+
+  const fontBtn = document.getElementById('fontBtn');
+  const fontPanel = document.getElementById('fontPanel');
+
+  function openFontPanel() {
+    renderFontList();
+    fontPanel.classList.add('show');
+  }
+  function closeFontPanel() { fontPanel.classList.remove('show'); }
+
+  fontBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeThemePanel();
+    fontPanel.classList.contains('show') ? closeFontPanel() : openFontPanel();
+  });
+
+  document.getElementById('fontList').addEventListener('click', (e) => {
+    const btn = e.target.closest('.font-option');
+    if (!btn) return;
+    applyFont(btn.dataset.font);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!fontPanel.classList.contains('show')) return;
+    if (e.target.closest('.theme-picker-wrap')) return;
+    closeFontPanel();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && fontPanel.classList.contains('show')) closeFontPanel();
+  });
+
+  renderFontList();
 
   function applySettingsToUI() {
     togglePunct.classList.toggle('active', settings.punctuation);
