@@ -341,6 +341,112 @@
 
   .font-panel { width: 200px; }
 
+  /* ---------- sync panel ---------- */
+  .sync-panel {
+    width: 280px;
+  }
+
+  .sync-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 3px;
+    margin-bottom: 12px;
+  }
+  .sync-tab {
+    appearance: none;
+    border: none;
+    background: transparent;
+    flex: 1;
+    color: var(--ink-faint);
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 7px 6px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .sync-tab:hover { color: var(--ink-dim); }
+  .sync-tab.active { background: var(--panel); color: var(--accent); }
+
+  .sync-copy {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-dim);
+    margin-bottom: 12px;
+  }
+
+  .sync-action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .sync-action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .sync-code-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 9px 11px;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    margin-bottom: 10px;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+  .sync-code-input:focus { border-color: var(--accent-dim); }
+  .sync-code-input::placeholder { color: var(--ink-faint); }
+
+  .sync-result {
+    margin-top: 10px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    line-height: 1.5;
+    display: none;
+  }
+  .sync-result.show { display: block; }
+  .sync-result.success { color: var(--good); }
+  .sync-result.error { color: var(--error); }
+  .sync-result.loading { color: var(--ink-faint); }
+
+  .sync-code-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg);
+    border: 1px solid var(--accent-dim);
+    border-radius: 7px;
+    padding: 10px 12px;
+    margin-top: 4px;
+  }
+  .sync-code-display .scd-code {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    flex: 1;
+    letter-spacing: 0.02em;
+  }
+  .sync-code-display .scd-copy {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--ink-dim);
+    cursor: pointer;
+    padding: 2px;
+    display: flex;
+    transition: color 0.15s ease;
+  }
+  .sync-code-display .scd-copy:hover { color: var(--accent); }
+
   .font-list {
     display: flex;
     flex-direction: column;
@@ -1099,6 +1205,7 @@
     .perf-table thead th:nth-child(6), .perf-table tbody td:nth-child(6) { display: none; }
     .theme-panel { width: 200px; right: -40px; }
     .font-panel { width: 180px; right: -40px; }
+    .sync-panel { width: 250px; right: -60px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1141,6 +1248,31 @@
         <div class="theme-panel font-panel" id="fontPanel">
           <div class="theme-panel-title">font</div>
           <div class="font-list" id="fontList"></div>
+        </div>
+      </div>
+      <div class="theme-picker-wrap">
+        <button class="icon-btn" id="syncBtn" title="Sync across devices" aria-label="Sync across devices">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-9 9c-2.52 0-4.93-1.06-6.7-2.82L3 16"></path><path d="M3 12a9 9 0 0 1 9-9c2.52 0 4.93 1.06 6.7 2.82L21 8"></path><polyline points="3 21 3 16 8 16"></polyline><polyline points="21 3 21 8 16 8"></polyline></svg>
+        </button>
+        <div class="theme-panel sync-panel" id="syncPanel">
+          <div class="theme-panel-title">sync across devices</div>
+          <div class="sync-tabs">
+            <button class="sync-tab active" data-tab="generate">generate code</button>
+            <button class="sync-tab" data-tab="restore">restore code</button>
+          </div>
+
+          <div class="sync-pane" id="syncPaneGenerate">
+            <p class="sync-copy">Upload your bests and history under a one-time code, then enter that code on another device to bring them over.</p>
+            <button class="btn primary sync-action-btn" id="syncGenerateBtn">generate code</button>
+            <div class="sync-result" id="syncGenerateResult"></div>
+          </div>
+
+          <div class="sync-pane" id="syncPaneRestore" style="display:none">
+            <p class="sync-copy">Enter a code generated on another device. This merges with what's already saved here — nothing local gets overwritten or lost.</p>
+            <input type="text" id="syncCodeInput" class="sync-code-input" placeholder="e.g. able-river-742" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+            <button class="btn primary sync-action-btn" id="syncRestoreBtn">restore</button>
+            <div class="sync-result" id="syncRestoreResult"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -2374,6 +2506,211 @@
   });
 
   renderFontList();
+
+  // ---------------- cross-device sync ----------------
+  // Backed by a small Supabase table (sync_codes: code text primary key,
+  // data text, created_at timestamptz). RLS allows anon insert + select
+  // only — no update or delete — so a code can never be overwritten or
+  // erased through the public API once written, only ever read back by
+  // someone who already has the exact code string. There's no "list all
+  // codes" capability anywhere in this app's queries, so this is
+  // effectively "share a key to get back what you locked with it," not an
+  // open browsable database.
+  const SUPABASE_URL = 'https://qtyyhiknmykzmlninrzq.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_BtyZysapta_GtPdi8zfSOA_UNMzBxM9';
+  const SYNC_TABLE_ENDPOINT = `${SUPABASE_URL}/rest/v1/sync_codes`;
+
+  const SYNC_WORDS = ['able','river','quiet','amber','swift','coral','maple','ember','frost','grove',
+    'pearl','vivid','solar','lunar','sable','tidal','windy','rocky','misty','sunny',
+    'cedar','birch','clear','bold','calm','keen','lush','warm','cool','bright'];
+
+  function generateSyncCode() {
+    const a = SYNC_WORDS[Math.floor(Math.random() * SYNC_WORDS.length)];
+    const b = SYNC_WORDS[Math.floor(Math.random() * SYNC_WORDS.length)];
+    const n = Math.floor(100 + Math.random() * 900); // 3-digit suffix
+    return `${a}-${b}-${n}`;
+  }
+
+  async function uploadSyncBundle() {
+    const bundle = { bests, history, exportedAt: Date.now() };
+    const payload = JSON.stringify(bundle);
+    // Try a few times in the vanishingly unlikely event of a code
+    // collision (the table's primary key would reject a duplicate insert).
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = generateSyncCode();
+      const res = await fetch(SYNC_TABLE_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({ code, data: payload }),
+      });
+      if (res.ok) return code;
+      if (res.status !== 409) {
+        // Anything other than a primary-key conflict is a real failure
+        // (network, RLS misconfigured, table missing, etc.) — surface it
+        // rather than silently retrying.
+        const text = await res.text().catch(() => '');
+        throw new Error(`Upload failed (${res.status}): ${text || 'unknown error'}`);
+      }
+      // 409 = code collision, loop and try a freshly generated one.
+    }
+    throw new Error('Could not generate a unique code after several attempts.');
+  }
+
+  async function downloadSyncBundle(code) {
+    const url = `${SYNC_TABLE_ENDPOINT}?code=eq.${encodeURIComponent(code)}&select=data`;
+    const res = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Lookup failed (${res.status}): ${text || 'unknown error'}`);
+    }
+    const rows = await res.json();
+    if (!rows.length) throw new Error('No sync data found for that code.');
+    return JSON.parse(rows[0].data);
+  }
+
+  // Merge a downloaded bundle into local storage WITHOUT discarding
+  // anything already here: bests keep whichever score is higher per mode
+  // key, history is the union of both lists deduped by timestamp, newest
+  // first, capped at the same 500-entry limit used everywhere else.
+  function mergeSyncBundle(remote) {
+    let changed = false;
+
+    Object.entries(remote.bests || {}).forEach(([key, remoteBest]) => {
+      const localBest = bests[key];
+      if (!localBest || remoteBest.wpm > localBest.wpm) {
+        bests[key] = remoteBest;
+        changed = true;
+      }
+    });
+
+    const seen = new Set(history.map(h => h.date));
+    (remote.history || []).forEach(h => {
+      if (seen.has(h.date)) return;
+      seen.add(h.date);
+      history.push(h);
+      changed = true;
+    });
+    history.sort((a, b) => b.date - a.date);
+    history = history.slice(0, 500);
+
+    if (changed) {
+      saveJSON(BESTS_KEY, bests);
+      saveJSON(HISTORY_KEY, history);
+      renderHistory();
+      refreshBestBadge();
+    }
+    return changed;
+  }
+
+  const syncBtn = document.getElementById('syncBtn');
+  const syncPanel = document.getElementById('syncPanel');
+  const syncGenerateBtn = document.getElementById('syncGenerateBtn');
+  const syncGenerateResult = document.getElementById('syncGenerateResult');
+  const syncRestoreBtn = document.getElementById('syncRestoreBtn');
+  const syncRestoreResult = document.getElementById('syncRestoreResult');
+  const syncCodeInput = document.getElementById('syncCodeInput');
+
+  function openSyncPanel() { syncPanel.classList.add('show'); }
+  function closeSyncPanel() { syncPanel.classList.remove('show'); }
+
+  syncBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeThemePanel();
+    closeFontPanel();
+    syncPanel.classList.contains('show') ? closeSyncPanel() : openSyncPanel();
+  });
+
+  document.querySelectorAll('.sync-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.sync-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const isGenerate = tab.dataset.tab === 'generate';
+      document.getElementById('syncPaneGenerate').style.display = isGenerate ? '' : 'none';
+      document.getElementById('syncPaneRestore').style.display = isGenerate ? 'none' : '';
+    });
+  });
+
+  function setSyncResult(el, text, kind) {
+    el.innerHTML = text;
+    el.className = 'sync-result show' + (kind ? ' ' + kind : '');
+  }
+
+  syncGenerateBtn.addEventListener('click', async () => {
+    if (!history.length && !Object.keys(bests).length) {
+      setSyncResult(syncGenerateResult, 'Finish at least one test before generating a code — there\'s nothing to sync yet.', 'error');
+      return;
+    }
+    syncGenerateBtn.disabled = true;
+    setSyncResult(syncGenerateResult, 'Uploading…', 'loading');
+    try {
+      const code = await uploadSyncBundle();
+      syncGenerateResult.className = 'sync-result show success';
+      syncGenerateResult.innerHTML = `
+        Code generated — enter this on your other device:
+        <div class="sync-code-display">
+          <span class="scd-code">${code}</span>
+          <button class="scd-copy" id="scdCopyBtn" title="Copy code" aria-label="Copy code">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          </button>
+        </div>
+      `;
+      document.getElementById('scdCopyBtn').addEventListener('click', () => {
+        navigator.clipboard?.writeText(code).catch(() => {});
+        const btn = document.getElementById('scdCopyBtn');
+        btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+      });
+    } catch (err) {
+      setSyncResult(syncGenerateResult, 'Could not generate a code. ' + (err.message || 'Check your connection and try again.'), 'error');
+    } finally {
+      syncGenerateBtn.disabled = false;
+    }
+  });
+
+  syncRestoreBtn.addEventListener('click', async () => {
+    const code = syncCodeInput.value.trim().toLowerCase();
+    if (!code) {
+      setSyncResult(syncRestoreResult, 'Enter a code first.', 'error');
+      return;
+    }
+    syncRestoreBtn.disabled = true;
+    setSyncResult(syncRestoreResult, 'Looking up code…', 'loading');
+    try {
+      const remote = await downloadSyncBundle(code);
+      const changed = mergeSyncBundle(remote);
+      setSyncResult(
+        syncRestoreResult,
+        changed ? 'Synced! Your bests and history now include that device\'s data.' : 'Already up to date — nothing new to merge.',
+        'success'
+      );
+    } catch (err) {
+      setSyncResult(syncRestoreResult, err.message || 'Could not find that code.', 'error');
+    } finally {
+      syncRestoreBtn.disabled = false;
+    }
+  });
+
+  syncCodeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); syncRestoreBtn.click(); }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!syncPanel.classList.contains('show')) return;
+    if (e.target.closest('.theme-picker-wrap')) return;
+    closeSyncPanel();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && syncPanel.classList.contains('show')) closeSyncPanel();
+  });
 
   function applySettingsToUI() {
     togglePunct.classList.toggle('active', settings.punctuation);
