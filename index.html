@@ -1213,6 +1213,279 @@
   }
 
   ::selection { background: var(--accent-dim); color: var(--ink); }
+
+  /* ---------- AI coach ---------- */
+  .coach-fab {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 50px;
+    padding: 12px 18px 12px 14px;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 24px var(--accent-glow);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  }
+  .coach-fab:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px var(--accent-glow);
+  }
+  .coach-fab:active { transform: scale(0.96); }
+  .coach-fab.hidden { opacity: 0; pointer-events: none; transform: translateY(8px); }
+
+  .coach-overlay {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 60;
+    width: 380px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 56px);
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .coach-overlay.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  .coach-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+    overflow: hidden;
+    max-height: calc(100vh - 56px);
+  }
+
+  .coach-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 14px 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+  .coach-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .coach-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .coach-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    letter-spacing: -0.01em;
+  }
+  .coach-subtitle {
+    font-size: 11px;
+    color: var(--ink-faint);
+    font-family: var(--font-ui);
+    margin-top: 1px;
+  }
+
+  .coach-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 280px;
+    max-height: 420px;
+    scroll-behavior: smooth;
+  }
+
+  .coach-msg {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    animation: msgrise 0.2s ease;
+  }
+  @keyframes msgrise {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .coach-msg.user { align-items: flex-end; }
+  .coach-msg.assistant { align-items: flex-start; }
+
+  .coach-bubble {
+    max-width: 85%;
+    padding: 10px 13px;
+    border-radius: 12px;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 1.55;
+    word-wrap: break-word;
+  }
+  .coach-msg.user .coach-bubble {
+    background: var(--accent);
+    color: var(--bg);
+    border-bottom-right-radius: 3px;
+  }
+  .coach-msg.assistant .coach-bubble {
+    background: var(--panel);
+    color: var(--ink);
+    border-bottom-left-radius: 3px;
+    border: 1px solid var(--border);
+  }
+
+  .coach-bubble p { margin: 0 0 6px; }
+  .coach-bubble p:last-child { margin-bottom: 0; }
+  .coach-bubble strong { color: var(--accent); font-weight: 600; }
+  .coach-bubble em { color: var(--ink-dim); }
+
+  .coach-typing {
+    display: flex;
+    gap: 4px;
+    padding: 4px 2px;
+  }
+  .coach-typing span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ink-faint);
+    animation: coachbounce 1.1s ease-in-out infinite;
+  }
+  .coach-typing span:nth-child(2) { animation-delay: 0.18s; }
+  .coach-typing span:nth-child(3) { animation-delay: 0.36s; }
+  @keyframes coachbounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-5px); opacity: 1; }
+  }
+
+  .coach-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+    text-align: center;
+  }
+  .coach-empty-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--accent-wash);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .coach-empty-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    font-family: var(--font-ui);
+  }
+  .coach-empty-sub {
+    font-size: 12px;
+    color: var(--ink-dim);
+    font-family: var(--font-ui);
+    line-height: 1.5;
+  }
+  .coach-prompts {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    margin-top: 4px;
+  }
+  .coach-prompt-btn {
+    appearance: none;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink-dim);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s ease, color 0.15s ease;
+    line-height: 1.4;
+  }
+  .coach-prompt-btn:hover { border-color: var(--accent-dim); color: var(--ink); }
+
+  .coach-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+  .coach-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+  .coach-input:focus { border-color: var(--accent-dim); }
+  .coach-input::placeholder { color: var(--ink-faint); }
+  .coach-send-btn {
+    appearance: none;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--bg);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: opacity 0.15s ease, transform 0.1s ease;
+  }
+  .coach-send-btn:hover { opacity: 0.85; }
+  .coach-send-btn:active { transform: scale(0.93); }
+  .coach-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  @media (max-width: 640px) {
+    .coach-fab { bottom: 20px; right: 16px; padding: 11px 15px 11px 12px; }
+    .coach-overlay { bottom: 16px; right: 16px; left: 16px; width: auto; }
+    .coach-messages { min-height: 220px; max-height: 340px; }
+  }
 </style>
 </head>
 <body>
@@ -1419,6 +1692,38 @@
         </table>
         <div class="perf-empty" id="perfEmpty">no tests yet — finish a test to see it here</div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- AI Coach -->
+<button class="coach-fab" id="coachFab" title="AI typing coach" aria-label="Open AI coach">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+  <span class="coach-fab-label">coach</span>
+</button>
+
+<div class="coach-overlay" id="coachOverlay">
+  <div class="coach-panel">
+    <div class="coach-header">
+      <div class="coach-header-left">
+        <div class="coach-avatar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+        </div>
+        <div>
+          <div class="coach-title">keypace coach</div>
+          <div class="coach-subtitle">AI-powered typing analyst</div>
+        </div>
+      </div>
+      <button class="icon-btn" id="coachCloseBtn" aria-label="Close coach">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="coach-messages" id="coachMessages"></div>
+    <div class="coach-input-row">
+      <input type="text" id="coachInput" class="coach-input" placeholder="Ask your coach anything…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+      <button class="coach-send-btn" id="coachSendBtn" aria-label="Send">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      </button>
     </div>
   </div>
 </div>
@@ -2871,7 +3176,7 @@
     // Don't steal focus when the user is interacting with controls (mode
     // pills, toggles, perf page, etc.) — only refocus when they tap the
     // typing area itself or elsewhere empty on the page.
-    if (e.target.closest('button, a, .perf-overlay, input, .theme-picker-wrap')) return;
+    if (e.target.closest('button, a, .perf-overlay, input, .theme-picker-wrap, .coach-overlay')) return;
     focusInput();
   });
 
@@ -2880,6 +3185,238 @@
   // global tab/escape capture even if focus elsewhere
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Tab') { e.preventDefault(); buildTest(); focusInput(); }
+  });
+
+  // ---------------- AI coach ----------------
+  const coachFab = document.getElementById('coachFab');
+  const coachOverlay = document.getElementById('coachOverlay');
+  const coachCloseBtn = document.getElementById('coachCloseBtn');
+  const coachMessages = document.getElementById('coachMessages');
+  const coachInput = document.getElementById('coachInput');
+  const coachSendBtn = document.getElementById('coachSendBtn');
+
+  let coachHistory = []; // {role, content} pairs sent to the API
+  let coachOpen = false;
+  let coachStreaming = false;
+  let coachInitialized = false;
+
+  const COACH_PROMPTS = [
+    'How am I progressing overall?',
+    'What should I focus on to improve?',
+    'Why does my accuracy drop at higher speeds?',
+    'How do I break through a WPM plateau?',
+  ];
+
+  function buildCoachSystemPrompt() {
+    const totalTests = history.length;
+    const recentTests = history.slice(0, 20);
+    const allWpm = recentTests.map(h => h.wpm);
+    const avgWpm = allWpm.length ? Math.round(allWpm.reduce((a, b) => a + b, 0) / allWpm.length) : null;
+    const allAcc = recentTests.map(h => h.acc);
+    const avgAcc = allAcc.length ? Math.round(allAcc.reduce((a, b) => a + b, 0) / allAcc.length) : null;
+
+    const bestsFormatted = Object.entries(bests).map(([key, b]) => {
+      const [mode, val] = key.split(':');
+      return `${val}${mode === 'time' ? 's' : 'w'}: ${b.wpm} WPM (${b.acc}% acc)`;
+    }).join(', ') || 'none yet';
+
+    const recentFormatted = recentTests.slice(0, 10).map(h => {
+      const mode = `${h.val}${h.mode === 'time' ? 's' : 'w'}`;
+      return `${mode} → ${h.wpm} WPM, ${h.acc}% acc`;
+    }).join('\n') || 'No tests yet.';
+
+    // Look for trends: is the user improving, plateauing, or declining?
+    let trend = '';
+    if (recentTests.length >= 6) {
+      const first3 = recentTests.slice(-3).map(h => h.wpm);
+      const last3 = recentTests.slice(0, 3).map(h => h.wpm);
+      const firstAvg = first3.reduce((a, b) => a + b, 0) / 3;
+      const lastAvg = last3.reduce((a, b) => a + b, 0) / 3;
+      const diff = lastAvg - firstAvg;
+      if (diff > 5) trend = 'improving (recent WPM higher than earlier sessions)';
+      else if (diff < -5) trend = 'declining slightly (recent WPM lower than earlier sessions)';
+      else trend = 'plateauing (WPM fairly consistent across sessions)';
+    }
+
+    // Accuracy/speed split — are they a sloppy-fast or careful-slow typer?
+    const avgRaw = recentTests.length ? Math.round(recentTests.map(h => h.raw || h.wpm).reduce((a, b) => a + b, 0) / recentTests.length) : null;
+    const accuracyGap = avgRaw && avgWpm ? avgRaw - avgWpm : null;
+
+    return `You are an encouraging, motivational AI typing coach for keypace.io, a typing speed test website. Your role is to analyze the user's typing data and help them improve — think of yourself as a supportive coach who genuinely cares about their progress, celebrates wins, and gives specific, actionable advice (not generic tips).
+
+Here is the user's current data:
+
+PERSONAL BESTS (by mode):
+${bestsFormatted}
+
+RECENT PERFORMANCE (last 10 tests, newest first):
+${recentFormatted}
+
+STATS SUMMARY:
+- Total tests completed: ${totalTests}
+- Recent average WPM: ${avgWpm ?? 'not enough data'}
+- Recent average accuracy: ${avgAcc ?? 'not enough data'}%${accuracyGap !== null ? `\n- Average raw vs corrected gap: ${accuracyGap} WPM (${accuracyGap > 8 ? 'typing fast but making many errors — accuracy is the main lever' : accuracyGap > 3 ? 'some errors at speed — a moderate tradeoff' : 'good accuracy control at current speed'})` : ''}${trend ? `\n- Trend: ${trend}` : ''}
+
+COACHING GUIDELINES:
+- Be warm, specific, and direct. Use the actual numbers from their data.
+- Celebrate genuine progress, even small wins. 
+- When giving advice, connect it to their specific pattern — don't give generic tips.
+- Keep responses concise but meaningful (2-4 short paragraphs max).
+- Use plain language. Avoid jargon unless you explain it.
+- If they haven't done many tests yet, encourage them to keep going and explain what you'll be able to see once there's more data.
+- Format your responses for readability using short paragraphs. You can use **bold** for key points.`;
+  }
+
+  function renderCoachEmpty() {
+    const hasData = history.length > 0;
+    coachMessages.innerHTML = `
+      <div class="coach-empty">
+        <div class="coach-empty-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+        </div>
+        <div class="coach-empty-title">Hi, I'm your keypace coach</div>
+        <div class="coach-empty-sub">${hasData ? "I've analyzed your stats and I'm ready to help. Ask me anything, or try one of these:" : "Complete a few tests first and I'll have real data to work with. Once you do, I can spot patterns and give you specific advice."}</div>
+        ${hasData ? `<div class="coach-prompts">${COACH_PROMPTS.map(p => `<button class="coach-prompt-btn" data-prompt="${p}">${p}</button>`).join('')}</div>` : ''}
+      </div>
+    `;
+  }
+
+  function appendUserMessage(text) {
+    const div = document.createElement('div');
+    div.className = 'coach-msg user';
+    div.innerHTML = `<div class="coach-bubble">${text.replace(/</g, '&lt;')}</div>`;
+    coachMessages.appendChild(div);
+    coachMessages.scrollTop = coachMessages.scrollHeight;
+    return div;
+  }
+
+  function appendAssistantMessage() {
+    const div = document.createElement('div');
+    div.className = 'coach-msg assistant';
+    div.innerHTML = `<div class="coach-bubble"><div class="coach-typing"><span></span><span></span><span></span></div></div>`;
+    coachMessages.appendChild(div);
+    coachMessages.scrollTop = coachMessages.scrollHeight;
+    return div;
+  }
+
+  // Minimal markdown: **bold**, line breaks → paragraphs
+  function renderMarkdown(text) {
+    return text
+      .split(/\n\n+/)
+      .map(para => `<p>${para.trim().replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')}</p>`)
+      .join('');
+  }
+
+  async function sendCoachMessage(userText) {
+    if (coachStreaming || !userText.trim()) return;
+    coachStreaming = true;
+    coachSendBtn.disabled = true;
+    coachInput.value = '';
+
+    // Clear empty state on first message
+    const emptyEl = coachMessages.querySelector('.coach-empty');
+    if (emptyEl) emptyEl.remove();
+
+    appendUserMessage(userText);
+    const assistantDiv = appendAssistantMessage();
+    const bubble = assistantDiv.querySelector('.coach-bubble');
+
+    coachHistory.push({ role: 'user', content: userText });
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          system: buildCoachSystemPrompt(),
+          messages: coachHistory,
+          stream: true,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `API error ${res.status}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      bubble.innerHTML = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        for (const line of chunk.split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed.delta?.text || '';
+            if (delta) {
+              fullText += delta;
+              bubble.innerHTML = renderMarkdown(fullText);
+              coachMessages.scrollTop = coachMessages.scrollHeight;
+            }
+          } catch (e) { /* skip malformed SSE lines */ }
+        }
+      }
+
+      coachHistory.push({ role: 'assistant', content: fullText });
+
+    } catch (err) {
+      bubble.innerHTML = `<p style="color:var(--error)">Something went wrong: ${err.message}. Try again in a moment.</p>`;
+      // Remove the failed message from history so the conversation stays clean
+      coachHistory.pop();
+    } finally {
+      coachStreaming = false;
+      coachSendBtn.disabled = false;
+      coachInput.focus();
+      coachMessages.scrollTop = coachMessages.scrollHeight;
+    }
+  }
+
+  function openCoach() {
+    coachOpen = true;
+    coachFab.classList.add('hidden');
+    coachOverlay.classList.add('show');
+    if (!coachInitialized) {
+      coachInitialized = true;
+      renderCoachEmpty();
+    }
+    coachInput.focus();
+  }
+
+  function closeCoach() {
+    coachOpen = false;
+    coachOverlay.classList.remove('show');
+    coachFab.classList.remove('hidden');
+  }
+
+  coachFab.addEventListener('click', openCoach);
+  coachCloseBtn.addEventListener('click', closeCoach);
+
+  coachMessages.addEventListener('click', (e) => {
+    const btn = e.target.closest('.coach-prompt-btn');
+    if (!btn) return;
+    sendCoachMessage(btn.dataset.prompt);
+  });
+
+  coachSendBtn.addEventListener('click', () => sendCoachMessage(coachInput.value));
+
+  coachInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendCoachMessage(coachInput.value);
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && coachOpen) closeCoach();
   });
 
   // ---------------- init ----------------
