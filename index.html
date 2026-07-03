@@ -1214,7 +1214,29 @@
 
   ::selection { background: var(--accent-dim); color: var(--ink); }
 
+  /* Focus mode — dims surrounding UI while actively typing so
+     attention stays solely on the words. */
+  body.is-typing header,
+  body.is-typing .toggles,
+  body.is-typing footer,
+  body.is-typing .restart-row {
+    opacity: 0.05;
+    transition: opacity 0.3s ease;
+  }
+  body.is-typing .topline {
+    opacity: 0.4;
+    transition: opacity 0.3s ease;
+  }
+  header, .toggles, footer, .restart-row, .topline {
+    transition: opacity 0.3s ease;
+  }
+
   /* ---------- AI coach ---------- */
+  body.is-typing .coach-fab {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
   .coach-fab {
     position: fixed;
     bottom: 28px;
@@ -1233,13 +1255,21 @@
     font-weight: 700;
     cursor: pointer;
     box-shadow: 0 4px 24px var(--accent-glow);
-    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.3s ease;
   }
-  .coach-fab:hover {
+  .coach-fab.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+  .coach-fab.visible:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 32px var(--accent-glow);
   }
-  .coach-fab:active { transform: scale(0.96); }
+  .coach-fab.visible:active { transform: scale(0.96); }
   .coach-fab.hidden { opacity: 0; pointer-events: none; transform: translateY(8px); }
 
   .coach-overlay {
@@ -1965,6 +1995,7 @@
     state.wpmHistory = [];
     state.errorsAtIndex = new Set();
     clearInterval(state.timerId);
+    document.body.classList.remove('is-typing');
 
     renderField();
     lastCaretLine = null;
@@ -1972,6 +2003,8 @@
     timerEl.classList.remove('show');
     liveWpmEl.classList.remove('show');
     result.classList.remove('show');
+    coachFab.classList.add('visible');
+    if (coachOverlay) coachOverlay.classList.remove('show');
     stage.style.display = 'flex';
     restartRow.classList.remove('hide');
     field.classList.remove('blurred');
@@ -2104,14 +2137,15 @@
     const lineIdx = Math.round(yAbsRaw / lineHeight);
     const y = lineIdx * lineHeight; // absolute, NOT minus scrollTop
 
-    // Keep the caret within a 3-line "page". Instead of sliding forward
-    // one line at a time forever (which keeps the caret pinned to the
-    // bottom row), the view advances in whole pages of 3: lines 0-2 sit at
-    // the top, then once you cross into line 3 the view snaps forward to a
-    // fresh page starting at line 3 (so the caret lands back on the TOP
-    // row of a clean set of 3, not the bottom row of a sliding window).
-    const visibleLines = 3;
-    const desiredScrollLines = Math.floor(lineIdx / visibleLines) * visibleLines;
+    // Keep the caret on the middle row of the 3-line window once past the
+    // first line — this means there's always one line of upcoming text
+    // already visible below the caret, so reaching a new line never causes
+    // a sudden snap or blank moment. The view rolls one line at a time as
+    // you type, exactly like MonkeyType's behaviour.
+    // Lines 0-1: no scroll yet (caret sits naturally at top).
+    // Line 2+: scroll so caret stays on row 1 (middle), with one typed
+    // line above and one upcoming line below always in view.
+    const desiredScrollLines = Math.max(0, lineIdx - 1);
     const desiredScrollTop = Math.round(desiredScrollLines * lineHeight);
     if (field.scrollTop !== desiredScrollTop) {
       field.scrollTop = desiredScrollTop;
@@ -2155,6 +2189,7 @@
     if (state.running || state.finished) return;
     state.running = true;
     state.startTime = performance.now();
+    document.body.classList.add('is-typing');
     if (state.mode === 'time') {
       timerEl.classList.add('show');
       state.timerId = setInterval(tick, 1000);
@@ -2321,6 +2356,7 @@
     state.finished = true;
     state.running = false;
     state.endTime = performance.now();
+    document.body.classList.remove('is-typing');
     clearInterval(state.timerId);
     recordWpmSample();
     showResults();
@@ -2375,6 +2411,7 @@
     stage.style.display = 'none';
     restartRow.classList.add('hide');
     result.classList.add('show');
+    coachFab.classList.add('visible');
   }
 
   function renderHistory() {
@@ -3382,7 +3419,7 @@ COACHING GUIDELINES:
 
   function openCoach() {
     coachOpen = true;
-    coachFab.classList.add('hidden');
+    coachFab.classList.remove('visible');
     coachOverlay.classList.add('show');
     if (!coachInitialized) {
       coachInitialized = true;
@@ -3394,7 +3431,7 @@ COACHING GUIDELINES:
   function closeCoach() {
     coachOpen = false;
     coachOverlay.classList.remove('show');
-    coachFab.classList.remove('hidden');
+    coachFab.classList.add('visible');
   }
 
   coachFab.addEventListener('click', openCoach);
