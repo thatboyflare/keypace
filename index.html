@@ -1345,7 +1345,7 @@
     border-radius: 16px;
     padding: 20px;
     width: 100%;
-    max-width: 560px;
+    max-width: 760px;
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -1954,7 +1954,7 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
     </div>
-    <canvas id="shareCanvas" width="800" height="420" style="width:100%;border-radius:10px;display:block;"></canvas>
+    <canvas id="shareCanvas" width="1200" height="630" style="width:100%;border-radius:10px;display:block;"></canvas>
     <div class="share-modal-actions">
       <button class="btn primary" id="shareDownloadBtn">download image</button>
       <button class="btn" id="shareCopyBtn">copy image</button>
@@ -3933,90 +3933,143 @@ COACHING GUIDELINES:
   // ---------------- share result card ----------------
   function drawShareCard(wpm, acc, raw, mode, val) {
     const canvas = document.getElementById('shareCanvas');
+    const W = 1200, H = 630;
+    canvas.width = W;
+    canvas.height = H;
     const ctx = canvas.getContext('2d');
-    const W = 800, H = 420;
 
-    // Resolve theme colors
-    const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
-    const bgSoft = getComputedStyle(document.documentElement).getPropertyValue('--bg-soft').trim();
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-    const ink = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
-    const inkDim = getComputedStyle(document.documentElement).getPropertyValue('--ink-dim').trim();
-    const inkFaint = getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim();
-    const border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+    const cs = getComputedStyle(document.documentElement);
+    const bg       = cs.getPropertyValue('--bg').trim();
+    const panel    = cs.getPropertyValue('--panel').trim();
+    const border   = cs.getPropertyValue('--border').trim();
+    const accent   = cs.getPropertyValue('--accent').trim();
+    const ink      = cs.getPropertyValue('--ink').trim();
+    const inkDim   = cs.getPropertyValue('--ink-dim').trim();
+    const inkFaint = cs.getPropertyValue('--ink-faint').trim();
 
-    // Background
+    // ── background ──────────────────────────────────────────────────────────
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
-    // Subtle accent gradient at top
-    const grad = ctx.createLinearGradient(0, 0, W, 0);
-    grad.addColorStop(0, hexToRgba(accent, 0.06));
-    grad.addColorStop(1, 'transparent');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H / 2);
+    // Subtle vertical stripe on the right third — purely geometric, no blur
+    ctx.fillStyle = hexToRgba(accent, 0.03);
+    ctx.fillRect(W * 0.66, 0, W * 0.34, H);
 
-    // Accent bar top
+    // Thin accent top bar
     ctx.fillStyle = accent;
-    ctx.fillRect(0, 0, W, 4);
+    ctx.fillRect(0, 0, W, 5);
+
+    // ── left column content ──────────────────────────────────────────────────
+    const PAD = 72;
 
     // Logo
-    ctx.font = 'bold 28px monospace';
+    ctx.textBaseline = 'top';
+    ctx.font = '700 26px monospace';
     ctx.fillStyle = ink;
-    ctx.fillText('keypace', 48, 68);
+    ctx.fillText('keypace', PAD, 56);
+    const logoW = ctx.measureText('keypace').width;
     ctx.fillStyle = accent;
-    ctx.fillText('_', 48 + ctx.measureText('keypace').width, 68);
+    ctx.fillText('_', PAD + logoW, 56);
 
-    // Mode label
-    const modeLabel = mode === 'daily' ? 'daily challenge' : mode === 'time' ? `${val}s test` : `${val} words`;
-    ctx.font = '14px sans-serif';
+    // Mode pill
+    const modeLabel = mode === 'daily' ? 'daily challenge'
+                    : mode === 'time'  ? `${val}s test`
+                                       : `${val} words`;
+    ctx.font = '500 14px sans-serif';
     ctx.fillStyle = inkFaint;
-    ctx.fillText(modeLabel.toUpperCase(), 48, 94);
+    ctx.fillText(modeLabel.toUpperCase(), PAD, 100);
 
-    // WPM — big
-    ctx.font = 'bold 120px monospace';
+    // ── giant WPM ───────────────────────────────────────────────────────────
+    // Draw the number first to measure it, then place "wpm" label precisely
+    ctx.font = '700 200px monospace';
     ctx.fillStyle = accent;
-    ctx.fillText(wpm, 48, 230);
+    ctx.fillText(String(wpm), PAD - 6, 156); // -6 to optically align with left edge
+    const wpmNumW = ctx.measureText(String(wpm)).width;
 
-    ctx.font = '22px sans-serif';
+    // "wpm" label — baseline-aligned to bottom of the number
+    ctx.font = '400 28px sans-serif';
     ctx.fillStyle = inkDim;
-    ctx.fillText('wpm', 48 + ctx.measureText(String(wpm)).width + 14, 210);
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('wpm', PAD + wpmNumW + 18, 156 + 200 - 20); // 200 = approx cap height of 200px font
+    ctx.textBaseline = 'top';
 
-    // Secondary stats
+    // ── stat pills row ──────────────────────────────────────────────────────
+    const statY = 420;
     const stats = [
       { label: 'accuracy', value: `${acc}%` },
-      { label: 'raw', value: `${raw} wpm` },
+      { label: 'raw wpm',  value: String(raw) },
     ];
-    let sx = 48;
-    const sy = 290;
-    stats.forEach(s => {
-      ctx.font = 'bold 13px sans-serif';
+
+    let sx = PAD;
+    stats.forEach((s) => {
+      // Pill background
+      const pillW = 160, pillH = 64;
+      ctx.fillStyle = hexToRgba(accent, 0.08);
+      roundRect(ctx, sx, statY, pillW, pillH, 12);
+      ctx.fill();
+
+      // Label
+      ctx.font = '500 12px sans-serif';
       ctx.fillStyle = accent;
-      ctx.fillText(s.label.toUpperCase(), sx, sy);
-      ctx.font = 'bold 32px monospace';
+      ctx.fillText(s.label.toUpperCase(), sx + 16, statY + 12);
+
+      // Value
+      ctx.font = '700 28px monospace';
       ctx.fillStyle = ink;
-      ctx.fillText(s.value, sx, sy + 36);
-      sx += 180;
+      ctx.fillText(s.value, sx + 16, statY + 30);
+
+      sx += pillW + 16;
     });
 
-    // Divider
-    ctx.strokeStyle = border;
+    // ── right column — decorative keystrokes pattern ─────────────────────────
+    const RX = W * 0.68;
+    const chars = 'keypace_ typing speed accuracy wpm';
+    ctx.font = '400 13px monospace';
+    ctx.fillStyle = hexToRgba(accent, 0.12);
+    let row = 0, col = 0;
+    const cellW = 22, cellH = 30;
+    const cols = Math.floor((W - RX - 40) / cellW);
+    const rows = Math.floor(H / cellH);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const ch = chars[(r * cols + c) % chars.length];
+        ctx.fillText(ch, RX + c * cellW, 20 + r * cellH);
+      }
+    }
+
+    // ── footer ───────────────────────────────────────────────────────────────
+    const footerY = H - 44;
+
+    // Thin divider
+    ctx.strokeStyle = hexToRgba(border, 0.6);
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(48, 350);
-    ctx.lineTo(W - 48, 350);
+    ctx.moveTo(PAD, footerY - 16);
+    ctx.lineTo(W * 0.62, footerY - 16);
     ctx.stroke();
 
-    // Footer
-    ctx.font = '13px sans-serif';
+    ctx.font = '400 14px sans-serif';
     ctx.fillStyle = inkFaint;
-    ctx.fillText('keypace.io  —  AI-powered typing coach', 48, 390);
+    ctx.textBaseline = 'top';
+    ctx.fillText('keypace.io', PAD, footerY);
 
-    // Date
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    ctx.textAlign = 'right';
-    ctx.fillText(dateStr, W - 48, 390);
-    ctx.textAlign = 'left';
+    ctx.fillText('·  ' + dateStr, PAD + ctx.measureText('keypace.io').width + 4, footerY);
+  }
+
+  // Helper — rounded rect path (not available natively in all canvas contexts)
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
   }
 
   let lastResultData = null;
