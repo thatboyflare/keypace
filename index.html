@@ -1887,9 +1887,6 @@
     <button class="toggle-btn" id="toggleCode" title="Code snippet mode">
       <span class="tdot"></span>code
     </button>
-    <button class="toggle-btn" id="toggleGhost" title="Race your personal best (requires a saved best for this mode)">
-      <span class="tdot"></span>ghost
-    </button>
     <span class="toggles-sep"></span>
     <button class="toggle-btn icon-only" id="toggleSound" title="Toggle keystroke sound">
       <svg class="snd-on" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
@@ -3625,7 +3622,6 @@
     togglePunct.classList.toggle('active', settings.punctuation);
     toggleNums.classList.toggle('active', settings.numbers);
     document.getElementById('toggleCode').classList.toggle('active', settings.code);
-    document.getElementById('toggleGhost').classList.toggle('active', settings.ghost);
     toggleSound.classList.toggle('active', settings.sound);
     toggleSound.querySelector('.snd-on').style.display = settings.sound ? '' : 'none';
     toggleSound.querySelector('.snd-off').style.display = settings.sound ? 'none' : '';
@@ -4157,7 +4153,6 @@ COACHING GUIDELINES:
   }
 
   function startGhostReplay() {
-    if (!settings.ghost) return;
     const ghost = loadGhost();
     if (!ghost || !ghost.timestamps || ghost.timestamps.length < 2) {
       return; // No best to race against yet
@@ -4213,16 +4208,6 @@ COACHING GUIDELINES:
     if (ghostReplayId) { cancelAnimationFrame(ghostReplayId); ghostReplayId = null; }
     ghostCaret.style.display = 'none';
   }
-
-  // Add ghost to settings
-  settings.ghost = settings.ghost || false;
-
-  document.getElementById('toggleGhost').addEventListener('click', () => {
-    settings.ghost = !settings.ghost;
-    saveJSON(SETTINGS_KEY, settings);
-    applySettingsToUI();
-    focusInput();
-  });
 
   // ---------------- share result card ----------------
   function drawShareCard(wpm, acc, raw, mode, val) {
