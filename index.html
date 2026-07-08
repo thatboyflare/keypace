@@ -2398,16 +2398,18 @@
     refreshBestBadge();
 
     // Check if daily already completed today
-    if (state.mode === 'daily') {
-      const dailyState = loadDailyState();
-      const banner = document.getElementById('dailyCompleteBanner');
-      if (banner) {
+    const banner = document.getElementById('dailyCompleteBanner');
+    if (banner) {
+      if (state.mode === 'daily') {
+        const dailyState = loadDailyState();
         if (dailyState && dailyState.date === getDailyDateStr()) {
           banner.innerHTML = `today's challenge complete! <strong>${dailyState.wpm} wpm</strong> · ${dailyState.acc}% acc — come back tomorrow.`;
           banner.classList.add('show');
         } else {
           banner.classList.remove('show');
         }
+      } else {
+        banner.classList.remove('show');
       }
     }
   }
