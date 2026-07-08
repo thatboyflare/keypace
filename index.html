@@ -267,7 +267,9 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
+    transition: opacity 0.15s ease;
   }
+  .logo-wrap:hover { opacity: 0.75; }
 
   .tagline {
     font-family: var(--font-ui);
@@ -1813,7 +1815,7 @@
 
 <div class="wrap">
   <header>
-    <div class="logo-wrap">
+    <div class="logo-wrap" id="logoWrap" style="cursor:pointer;" title="New test">
       <div class="logo"><span>keypace</span><span class="dot">_</span></div>
       <div class="tagline">become a faster, more accurate, and more confident typist.</div>
     </div>
@@ -3692,6 +3694,7 @@
   });
 
   document.getElementById('restartBtn').addEventListener('click', () => { buildTest(); focusInput(); });
+  document.getElementById('logoWrap').addEventListener('click', () => { buildTest(); focusInput(); });
   document.getElementById('nextBtn').addEventListener('click', () => { buildTest(); focusInput(); });
   document.getElementById('sameBtn').addEventListener('click', () => {
     // repeat same words
