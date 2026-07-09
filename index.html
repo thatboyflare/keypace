@@ -3085,7 +3085,7 @@
                        parseFloat(getComputedStyle(field).fontSize) * 1.7;
 
     // Set caret height once
-    caret.style.height = `${lineHeight * 0.82}px`;
+    caret.style.height = `${lineHeight}px`;
 
     function frame(now) {
       const elapsed = now - startTime;
@@ -3121,7 +3121,7 @@
         }
         // y in unscrolled absolute coordinates — browser shifts it with scrollTop
         const y = lineIdx * lineHeight;
-        caret.style.transform = `translate3d(${x}px, ${y + lineHeight * 0.09}px, 0)`;
+        caret.style.transform = `translate3d(${x}px, ${y}px, 0)`;
       }
 
       // Progress bar
