@@ -1367,15 +1367,20 @@
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    overflow: hidden;
+    max-height: 220px;
+  }
+  .ghost-viewer-field {
+    position: relative;
     padding: 20px 24px;
     font-family: var(--font-mono);
     font-size: 22px;
     line-height: 1.7;
     color: var(--ink-faint);
-    overflow: hidden;
-    max-height: 220px;
     letter-spacing: 0.3px;
     user-select: none;
+    overflow: hidden;
+    max-height: 220px;
   }
   .ghost-viewer-caret {
     position: absolute;
@@ -2055,7 +2060,6 @@
     </div>
     <div class="ghost-viewer-field-wrap">
       <div class="ghost-viewer-field" id="ghostViewerField"></div>
-      <div class="ghost-viewer-caret" id="ghostViewerCaret"></div>
     </div>
     <div class="ghost-viewer-progress">
       <div class="ghost-viewer-bar" id="ghostViewerBar"></div>
@@ -3028,7 +3032,6 @@
   function openGhostViewer(h) {
     const viewer = document.getElementById('ghostViewer');
     const viewerField = document.getElementById('ghostViewerField');
-    const caret = document.getElementById('ghostViewerCaret');
     const meta = document.getElementById('ghostViewerMeta');
     const bar = document.getElementById('ghostViewerBar');
 
@@ -3038,11 +3041,22 @@
     // Stop any existing replay
     if (ghostViewerRafId) { cancelAnimationFrame(ghostViewerRafId); ghostViewerRafId = null; }
 
-    // Build the text display
+    // Build the text display — caret lives INSIDE the field div so it
+    // shares the same positioning context as the text spans, eliminating
+    // the padding offset that was pushing it above the text.
     const text = h.words.join(' ');
     viewerField.innerHTML = text.split('').map((c) => {
-      return `<span class="gvc-pending">${c}</span>`;
+      return `<span class="gvc-pending">${c === '<' ? '&lt;' : c}</span>`;
     }).join('');
+
+    // Create caret inside the field
+    let caret = viewerField.querySelector('.ghost-viewer-caret');
+    if (!caret) {
+      caret = document.createElement('div');
+      caret.className = 'ghost-viewer-caret';
+      viewerField.appendChild(caret);
+    }
+    caret.style.display = 'none';
     viewerField.scrollTop = 0;
 
     // Meta info
@@ -3052,7 +3066,6 @@
 
     // Show viewer
     viewer.style.display = 'flex';
-    caret.style.display = 'none';
     bar.style.width = '0%';
 
     // Auto-start replay
@@ -3090,7 +3103,9 @@
         sp.className = i < idx ? 'gvc-correct' : 'gvc-pending';
       });
 
-      // Position caret using getBoundingClientRect relative to field
+      // Position caret — caret is position:absolute inside the field div,
+      // so getBoundingClientRect() already reflects the current scroll offset.
+      // y must NOT subtract scrollTop again or it double-compensates.
       const span = spans[idx];
       if (span) {
         const fieldRect = field.getBoundingClientRect();
@@ -3099,12 +3114,13 @@
         const yAbsRaw = (spanRect.top - fieldRect.top) + field.scrollTop;
         const lineIdx = Math.round(yAbsRaw / lineHeight);
 
-        // Scroll field to keep caret visible
+        // Scroll field to keep caret on the middle row
         const desiredScrollTop = Math.max(0, lineIdx - 1) * lineHeight;
         if (Math.abs(field.scrollTop - desiredScrollTop) > 2) {
           field.scrollTop = desiredScrollTop;
         }
-        const y = lineIdx * lineHeight - field.scrollTop;
+        // y in unscrolled absolute coordinates — browser shifts it with scrollTop
+        const y = lineIdx * lineHeight;
         caret.style.transform = `translate3d(${x}px, ${y + lineHeight * 0.09}px, 0)`;
       }
 
@@ -3125,22 +3141,19 @@
 
   function closeGhostViewer() {
     if (ghostViewerRafId) { cancelAnimationFrame(ghostViewerRafId); ghostViewerRafId = null; }
-    const viewer = document.getElementById('ghostViewer');
-    viewer.style.display = 'none';
+    document.getElementById('ghostViewer').style.display = 'none';
   }
 
   document.getElementById('ghostViewerBack').addEventListener('click', closeGhostViewer);
 
   document.getElementById('ghostViewerReplay').addEventListener('click', () => {
-    const field = document.getElementById('ghostViewerField');
-    const caret = document.getElementById('ghostViewerCaret');
+    const viewerField = document.getElementById('ghostViewerField');
+    const caret = viewerField.querySelector('.ghost-viewer-caret');
     const bar = document.getElementById('ghostViewerBar');
-    // Find the currently displayed history entry from meta — re-derive from stored state
     if (ghostViewerRafId) { cancelAnimationFrame(ghostViewerRafId); ghostViewerRafId = null; }
-    field.scrollTop = 0;
-    // Replay the same entry — stored in the viewer's data attribute
+    viewerField.scrollTop = 0;
     const idx = parseInt(document.getElementById('ghostViewer').dataset.historyIdx || '0', 10);
-    if (history[idx]) startViewerReplay(history[idx], field, caret, bar);
+    if (history[idx]) startViewerReplay(history[idx], viewerField, caret, bar);
   });
 
   function openPerfPage() {
