@@ -2136,7 +2136,7 @@
   'use strict';
 
   // ---------------- word bank ----------------
-  const WORDS = ("the of and to in a is that it for on with as was at by an be this have from or had not but what all were when we there can an your which their said if will each about how up out them then she many some so these would other into has more her two like him see time could no make than first been its who now people my made over did down only way find use may water been call who oil its now find long down day did get come made part over new sound take only little work know place year live me back give most very after thing our just name good sentence man think say great where help through much before line right too mean old any same tell boy follow came want show also around form three small set put end does another well large must big even such because turn here why ask went men read need land different home us move try kind hand picture again change off play spell air away animal house point page letter mother answer found study still learn should america world high every near add food between own below country plant last school father keep tree never start city earth eye light thought head under story saw left don few while along might close something seem next hard open example begin life always those both paper together got group often run important until children side feet car mile night walk white sea began grow took river four carry state once book hear stop without second later miss idea enough eat face watch far indian really almost let above girl sometimes mountain cut young talk soon list song being leave family it's").split(' ');
+  const WORDS = [...new Set(("the of and to in a is that it for on with as was at by an be this have from or had not but what all were when we there can your which their said if will each about how up out them then she many some so these would other into has more her two like him see time could no make than first been its who now people my made over did down only way find use may water call long day get come part new sound take little work know place year live me back give most very after thing our just name good sentence man think say great where help through much before line right too mean old any same tell boy follow came want show also around form three small set put end does another well large must big even such because turn here why ask went men read need land different home us move try kind hand picture again change off play spell air away animal house point page letter mother answer found study still learn should america world high every near add food between own below country plant last school father keep tree never start city earth eye light thought head under story saw left don few while along might close something seem next hard open example begin life always those both paper together got group often run important until children side feet car mile night walk white sea began grow took river four carry state once book hear stop without second later miss idea enough eat face watch far really almost let above girl sometimes mountain cut young talk soon list song being leave family door room horse question science music color stand black night real course force record fact pulled voice seen cold cried plan notice south mark special early possible able true clear morning course window fire road quite often late however sure several start bring thought face back never must knew white though might place each last help city build near start earth being later never plan special toward across already kept place build door road music fire morning window ever during stood several voice special course force fact pulled cold cried plan south mark able true clear question record morning fire window quite during stood voice build already toward kept across").split(' ').filter(w => w.length > 1))];
 
   function capitalize(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
 
@@ -4069,13 +4069,22 @@ COACHING GUIDELINES:
 
   function genDailyWords() {
     const dateStr = getDailyDateStr();
-    const seed = dateStr.split('-').reduce((acc, n) => acc * 100 + parseInt(n), 0);
+    // Mix date components with primes so adjacent dates produce very
+    // different word sequences — the simple YYYYMMDD seed made nearby
+    // dates feel similar since the RNG sequences were close together.
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const seed = ((y * 373 + m * 6271 + d * 99991) ^ (y << 9) ^ (m << 17) ^ (d << 3)) >>> 0;
     const rng = seededRNG(seed);
-    const words = [];
-    for (let i = 0; i < 50; i++) {
-      words.push(WORDS[Math.floor(rng() * WORDS.length)]);
+
+    // Fisher-Yates shuffle a copy of the word list using the seeded RNG,
+    // then take the first 60 words — guarantees no repeats within a day's
+    // set regardless of how large or small the word bank is.
+    const pool = WORDS.slice();
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    return words;
+    return pool.slice(0, 60);
   }
 
   function loadDailyState() {
