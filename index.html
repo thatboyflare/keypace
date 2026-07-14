@@ -788,32 +788,6 @@
   .caret.blink { animation: caretblink 1.05s ease-in-out infinite; }
   @keyframes caretblink { 0%, 42% { opacity: 1; } 65%, 92% { opacity: 0.12; } 100% { opacity: 1; } }
 
-  .ghost-caret {
-    position: absolute;
-    width: 2px;
-    border-radius: 2px;
-    background: var(--ink-dim);
-    opacity: 0.4;
-    will-change: transform;
-    transform: translate3d(0,0,0);
-    transition: transform 0.045s linear;
-    pointer-events: none;
-    z-index: 1;
-  }
-  .ghost-caret::before {
-    content: 'pb';
-    position: absolute;
-    top: -16px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-family: var(--font-ui);
-    font-size: 9px;
-    font-weight: 600;
-    color: var(--ink-faint);
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-  }
-
   .hint {
     position: absolute;
     inset: 0;
@@ -1917,7 +1891,6 @@
       </div>
 
       <div class="field" id="field" tabindex="0"></div>
-      <div class="ghost-caret" id="ghostCaret" style="display:none"></div>
       <input
         id="mobileInput"
         class="mobile-input"
@@ -2382,7 +2355,6 @@
     state.errorsAtIndex = new Set();
     ghostTimestamps = [];
     clearInterval(state.timerId);
-    stopGhostReplay();
     document.body.classList.remove('is-typing');
 
     renderField();
@@ -2601,7 +2573,6 @@
       state.timerId = setInterval(tick, 1000);
     }
     liveWpmEl.classList.add('show');
-    startGhostReplay();
   }
 
   function tick() {
@@ -4174,76 +4145,13 @@ COACHING GUIDELINES:
   // ---------------- ghost replay ----------------
   // Races your personal best against you in real-time during a test.
   // The ghost caret (faint, lives inside the same field as the typing text)
-  // plays back the exact keystroke timing of your best run so you can see
-  // where you're ahead or behind as you type.
+  // ghostTimestamps records keypress timing during tests for the history
+  // replay viewer in the performance page.
   const GHOST_KEY = 'keypace_ghost_v1';
   let ghostTimestamps = [];
-  let ghostReplayId = null;
-  const ghostCaret = document.getElementById('ghostCaret');
-
-  function loadGhost() {
-    try { return JSON.parse(localStorage.getItem(GHOST_KEY) || 'null'); } catch { return null; }
-  }
 
   function saveGhost(data) {
     try { localStorage.setItem(GHOST_KEY, JSON.stringify(data)); } catch {}
-  }
-
-  function startGhostReplay() {
-    const ghost = loadGhost();
-    if (!ghost || !ghost.timestamps || ghost.timestamps.length < 2) {
-      return; // No best to race against yet
-    }
-    // Only replay if the ghost was set on the same mode+val
-    const key = bestKeyFor(state.mode, state.val);
-    if (ghost.key !== key) return;
-
-    const spans = charSpans();
-    if (!spans.length) return;
-
-    ghostCaret.style.display = 'block';
-    const testStart = state.startTime;
-
-    function ghostFrame(now) {
-      if (!state.running && !state.finished) {
-        ghostCaret.style.display = 'none';
-        return;
-      }
-      const elapsed = now - testStart;
-      // Find which char index the ghost has reached at this elapsed time
-      let idx = 0;
-      for (let i = 0; i < ghost.timestamps.length; i++) {
-        if (ghost.timestamps[i] <= elapsed) idx = i;
-        else break;
-      }
-      idx = Math.min(idx, spans.length - 1);
-
-      const rect = rectForChar(idx, false);
-      const fieldRect = field.getBoundingClientRect();
-      const lineHeight = getLineHeight();
-
-      if (rect) {
-        const x = (rect.left - fieldRect.left) + field.scrollLeft;
-        const yAbsRaw = (rect.top - fieldRect.top) + field.scrollTop;
-        const lineIdx = Math.round(yAbsRaw / lineHeight);
-        const y = lineIdx * lineHeight;
-        ghostCaret.style.height = `${lineHeight * 0.82}px`;
-        ghostCaret.style.transform = `translate3d(${x}px, ${y + lineHeight * 0.09}px, 0)`;
-      }
-
-      if (elapsed <= ghost.timestamps[ghost.timestamps.length - 1] + 500) {
-        ghostReplayId = requestAnimationFrame(ghostFrame);
-      } else {
-        ghostCaret.style.display = 'none';
-      }
-    }
-
-    ghostReplayId = requestAnimationFrame(ghostFrame);
-  }
-
-  function stopGhostReplay() {
-    if (ghostReplayId) { cancelAnimationFrame(ghostReplayId); ghostReplayId = null; }
-    ghostCaret.style.display = 'none';
   }
 
   // ---------------- share result card ----------------
