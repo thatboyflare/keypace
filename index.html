@@ -1371,7 +1371,7 @@
     max-height: 220px;
   }
   .ghost-viewer-field {
-    position: relative;
+    position: static;
     padding: 20px 24px;
     font-family: var(--font-mono);
     font-size: 22px;
@@ -3049,12 +3049,16 @@
       return `<span class="gvc-pending">${c === '<' ? '&lt;' : c}</span>`;
     }).join('');
 
-    // Create caret inside the field
-    let caret = viewerField.querySelector('.ghost-viewer-caret');
+    // Create caret inside the WRAP (position:relative, no padding) not
+    // the field (no position, has padding) — this ensures getBoundingClientRect
+    // on spans, measured relative to the wrap, matches the caret's own
+    // top:0 left:0 origin exactly, with no padding offset to account for.
+    const wrap = viewerField.closest('.ghost-viewer-field-wrap') || viewerField.parentElement;
+    let caret = wrap.querySelector('.ghost-viewer-caret');
     if (!caret) {
       caret = document.createElement('div');
       caret.className = 'ghost-viewer-caret';
-      viewerField.appendChild(caret);
+      wrap.appendChild(caret);
     }
     caret.style.display = 'none';
     viewerField.scrollTop = 0;
@@ -3084,6 +3088,10 @@
     const lineHeight = parseFloat(getComputedStyle(field).lineHeight) ||
                        parseFloat(getComputedStyle(field).fontSize) * 1.7;
 
+    // The caret lives in the wrap (position:relative, no padding).
+    // We measure span positions relative to the wrap so coordinates match.
+    const wrap = caret.parentElement;
+
     // Set caret height once
     caret.style.height = `${lineHeight}px`;
 
@@ -3103,24 +3111,25 @@
         sp.className = i < idx ? 'gvc-correct' : 'gvc-pending';
       });
 
-      // Position caret — caret is position:absolute inside the field div,
-      // so getBoundingClientRect() already reflects the current scroll offset.
-      // y must NOT subtract scrollTop again or it double-compensates.
+      // Measure span position relative to the wrap (the caret's containing
+      // block). Since the caret is in the wrap (no padding) and spans are in
+      // the field (has 20px top / 24px left padding), getBoundingClientRect
+      // differences correctly account for the padding already.
       const span = spans[idx];
       if (span) {
-        const fieldRect = field.getBoundingClientRect();
+        const wrapRect = wrap.getBoundingClientRect();
         const spanRect = span.getBoundingClientRect();
-        const x = spanRect.left - fieldRect.left;
-        const yAbsRaw = (spanRect.top - fieldRect.top) + field.scrollTop;
-        const lineIdx = Math.round(yAbsRaw / lineHeight);
+        const x = spanRect.left - wrapRect.left;
+        const y = spanRect.top - wrapRect.top;
 
-        // Scroll field to keep caret on the middle row
+        // Scroll field to keep current line in the middle of the view
+        const yInField = spanRect.top - field.getBoundingClientRect().top + field.scrollTop;
+        const lineIdx = Math.round(yInField / lineHeight);
         const desiredScrollTop = Math.max(0, lineIdx - 1) * lineHeight;
         if (Math.abs(field.scrollTop - desiredScrollTop) > 2) {
           field.scrollTop = desiredScrollTop;
         }
-        // y in unscrolled absolute coordinates — browser shifts it with scrollTop
-        const y = lineIdx * lineHeight;
+
         caret.style.transform = `translate3d(${x}px, ${y}px, 0)`;
       }
 
@@ -3148,12 +3157,13 @@
 
   document.getElementById('ghostViewerReplay').addEventListener('click', () => {
     const viewerField = document.getElementById('ghostViewerField');
-    const caret = viewerField.querySelector('.ghost-viewer-caret');
+    const wrap = viewerField.closest('.ghost-viewer-field-wrap') || viewerField.parentElement;
+    const caret = wrap.querySelector('.ghost-viewer-caret');
     const bar = document.getElementById('ghostViewerBar');
     if (ghostViewerRafId) { cancelAnimationFrame(ghostViewerRafId); ghostViewerRafId = null; }
     viewerField.scrollTop = 0;
     const idx = parseInt(document.getElementById('ghostViewer').dataset.historyIdx || '0', 10);
-    if (history[idx]) startViewerReplay(history[idx], viewerField, caret, bar);
+    if (history[idx] && caret) startViewerReplay(history[idx], viewerField, caret, bar);
   });
 
   function openPerfPage() {
