@@ -2972,7 +2972,7 @@
     renderHistory();
 
     // ---- save for share card ----
-    lastResultData = { wpm, acc: accClamped, raw, mode: state.mode, val: state.val };
+    lastResultData = { wpm, acc: accClamped, raw, mode: state.mode, val: state.val, date: Date.now() };
 
     stage.style.display = 'none';
     restartRow.classList.add('hide');
@@ -3043,8 +3043,27 @@
         <div class="pbc-mode">${m.label}</div>
         <div class="pbc-wpm">${b ? b.wpm : '—'}${b ? '<small>wpm</small>' : ''}</div>
         <div class="pbc-meta">${b ? (b.acc + '% acc · ' + formatDate(b.date)) : 'no runs yet'}</div>
+        ${b ? `<button class="perf-replay-btn pbc-share-btn" data-key="${m.key}" style="margin-top:6px;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+          share pb
+        </button>` : ''}
       `;
       bestsGrid.appendChild(card);
+    });
+
+    // Wire share buttons on best cards
+    bestsGrid.addEventListener('click', (e) => {
+      const btn = e.target.closest('.pbc-share-btn');
+      if (!btn) return;
+      const key = btn.dataset.key;
+      const b = bests[key];
+      const modeInfo = PERF_MODES.find(m => m.key === key);
+      if (b && modeInfo) {
+        openShareFromHistory({
+          wpm: b.wpm, acc: b.acc, raw: b.wpm, // raw not stored in bests, use wpm as approx
+          mode: modeInfo.mode, val: modeInfo.val, date: b.date
+        });
+      }
     });
   }
 
@@ -3146,20 +3165,33 @@
         <td>${h.acc}%</td>
         <td>${h.chars}</td>
         <td>${h.time}s</td>
-        <td>${hasReplay ? `<button class="perf-replay-btn" data-idx="${idx}">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-          replay
-        </button>` : ''}</td>
+        <td style="display:flex;gap:6px;align-items:center;">
+          ${hasReplay ? `<button class="perf-replay-btn" data-idx="${idx}">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            replay
+          </button>` : ''}
+          <button class="perf-replay-btn perf-share-btn" data-idx="${idx}" title="Share this result">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+            share
+          </button>
+        </td>
       `;
       tbody.appendChild(tr);
     });
 
-    // Wire up replay buttons
+    // Wire up replay and share buttons
     tbody.addEventListener('click', (e) => {
-      const btn = e.target.closest('.perf-replay-btn');
-      if (!btn) return;
-      const h = history[parseInt(btn.dataset.idx, 10)];
-      if (h) openGhostViewer(h);
+      const replayBtn = e.target.closest('.perf-replay-btn:not(.perf-share-btn)');
+      if (replayBtn) {
+        const h = history[parseInt(replayBtn.dataset.idx, 10)];
+        if (h) openGhostViewer(h);
+        return;
+      }
+      const shareBtn = e.target.closest('.perf-share-btn');
+      if (shareBtn) {
+        const h = history[parseInt(shareBtn.dataset.idx, 10)];
+        if (h) openShareFromHistory(h);
+      }
     });
   }
 
@@ -4596,7 +4628,7 @@ COACHING GUIDELINES:
   }
 
   // ---------------- share result card ----------------
-  function drawShareCard(wpm, acc, raw, mode, val) {
+  function drawShareCard(wpm, acc, raw, mode, val, dateTs) {
     const canvas = document.getElementById('shareCanvas');
     const W = 1200, H = 630;
     canvas.width = W;
@@ -4612,114 +4644,141 @@ COACHING GUIDELINES:
     const inkDim   = cs.getPropertyValue('--ink-dim').trim();
     const inkFaint = cs.getPropertyValue('--ink-faint').trim();
 
-    // ── background ──────────────────────────────────────────────────────────
+    const CX = W / 2; // center x
+
+    // ── Background ───────────────────────────────────────────────────────────
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
-    // Subtle vertical stripe on the right third — purely geometric, no blur
-    ctx.fillStyle = hexToRgba(accent, 0.03);
-    ctx.fillRect(W * 0.66, 0, W * 0.34, H);
+    // Radial glow from top center — subtle, depth without noise
+    const grd = ctx.createRadialGradient(CX, 0, 0, CX, 0, 560);
+    grd.addColorStop(0, hexToRgba(accent, 0.07));
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
 
-    // Thin accent top bar
-    ctx.fillStyle = accent;
-    ctx.fillRect(0, 0, W, 5);
+    // Top accent bar
+    const barH = 4;
+    const grad = ctx.createLinearGradient(0, 0, W, 0);
+    grad.addColorStop(0, 'transparent');
+    grad.addColorStop(0.3, accent);
+    grad.addColorStop(0.7, accent);
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, barH);
 
-    // ── left column content ──────────────────────────────────────────────────
-    const PAD = 72;
-
-    // Logo
+    // ── Logo — top left ───────────────────────────────────────────────────────
     ctx.textBaseline = 'top';
-    ctx.font = '700 26px monospace';
-    ctx.fillStyle = ink;
-    ctx.fillText('keypace', PAD, 56);
-    const logoW = ctx.measureText('keypace').width;
-    ctx.fillStyle = accent;
-    ctx.fillText('_', PAD + logoW, 56);
-
-    // Mode pill
-    const modeLabel = mode === 'daily' ? 'daily challenge'
-                    : mode === 'time'  ? `${val}s test`
-                                       : `${val} words`;
-    ctx.font = '500 14px sans-serif';
-    ctx.fillStyle = inkFaint;
-    ctx.fillText(modeLabel.toUpperCase(), PAD, 100);
-
-    // ── giant WPM ───────────────────────────────────────────────────────────
-    // Draw the number first to measure it, then place "wpm" label precisely
-    ctx.font = '700 200px monospace';
-    ctx.fillStyle = accent;
-    ctx.fillText(String(wpm), PAD - 6, 156); // -6 to optically align with left edge
-    const wpmNumW = ctx.measureText(String(wpm)).width;
-
-    // "wpm" label — baseline-aligned to bottom of the number
-    ctx.font = '400 28px sans-serif';
+    ctx.font = '600 24px monospace';
     ctx.fillStyle = inkDim;
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('wpm', PAD + wpmNumW + 18, 156 + 200 - 20); // 200 = approx cap height of 200px font
-    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    ctx.fillText('keypace', 64, 52);
+    ctx.fillStyle = accent;
+    ctx.fillText('_', 64 + ctx.measureText('keypace').width, 52);
 
-    // ── stat pills row ──────────────────────────────────────────────────────
-    const statY = 420;
+    // ── Date — top right ──────────────────────────────────────────────────────
+    const dateStr = dateTs
+      ? new Date(dateTs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    ctx.font = '400 14px sans-serif';
+    ctx.fillStyle = inkFaint;
+    ctx.textAlign = 'right';
+    ctx.fillText(dateStr, W - 64, 56);
+
+    // ── Mode label — centered ────────────────────────────────────────────────
+    const modeLabel = mode === 'daily' ? 'daily challenge'
+                    : mode === 'time'  ? `${val} second test`
+                                       : `${val} word test`;
+    ctx.font = '500 15px sans-serif';
+    ctx.fillStyle = inkFaint;
+    ctx.textAlign = 'center';
+    ctx.letterSpacing = '0.08em';
+    ctx.fillText(modeLabel.toUpperCase(), CX, 148);
+    ctx.letterSpacing = '0';
+
+    // ── Giant WPM — centered hero ─────────────────────────────────────────────
+    ctx.font = '700 220px monospace';
+    ctx.fillStyle = accent;
+    ctx.textAlign = 'center';
+    ctx.fillText(String(wpm), CX, 170);
+
+    // "wpm" unit below the number
+    ctx.font = '300 28px sans-serif';
+    ctx.fillStyle = inkDim;
+    ctx.textAlign = 'center';
+    ctx.fillText('words per minute', CX, 420);
+
+    // ── Stat row — centered ────────────────────────────────────────────────────
     const stats = [
       { label: 'accuracy', value: `${acc}%` },
       { label: 'raw wpm',  value: String(raw) },
     ];
+    const pillW = 200, pillH = 80, pillGap = 24;
+    const totalW = stats.length * pillW + (stats.length - 1) * pillGap;
+    let sx = CX - totalW / 2;
+    const pillY = 476;
 
-    let sx = PAD;
     stats.forEach((s) => {
-      // Pill background
-      const pillW = 160, pillH = 64;
-      ctx.fillStyle = hexToRgba(accent, 0.08);
-      roundRect(ctx, sx, statY, pillW, pillH, 12);
+      // pill bg
+      ctx.fillStyle = hexToRgba(accent, 0.07);
+      roundRect(ctx, sx, pillY, pillW, pillH, 14);
       ctx.fill();
 
-      // Label
-      ctx.font = '500 12px sans-serif';
+      // thin pill border
+      ctx.strokeStyle = hexToRgba(accent, 0.2);
+      ctx.lineWidth = 1;
+      roundRect(ctx, sx, pillY, pillW, pillH, 14);
+      ctx.stroke();
+
+      // label
+      ctx.font = '500 11px sans-serif';
       ctx.fillStyle = accent;
-      ctx.fillText(s.label.toUpperCase(), sx + 16, statY + 12);
+      ctx.textAlign = 'center';
+      ctx.letterSpacing = '0.07em';
+      ctx.fillText(s.label.toUpperCase(), sx + pillW / 2, pillY + 16);
+      ctx.letterSpacing = '0';
 
-      // Value
-      ctx.font = '700 28px monospace';
+      // value
+      ctx.font = '700 32px monospace';
       ctx.fillStyle = ink;
-      ctx.fillText(s.value, sx + 16, statY + 30);
+      ctx.textAlign = 'center';
+      ctx.fillText(s.value, sx + pillW / 2, pillY + 32);
 
-      sx += pillW + 16;
+      sx += pillW + pillGap;
     });
 
-    // ── right column — decorative keystrokes pattern ─────────────────────────
-    const RX = W * 0.68;
-    const chars = 'keypace_ typing speed accuracy wpm';
-    ctx.font = '400 13px monospace';
-    ctx.fillStyle = hexToRgba(accent, 0.12);
-    let row = 0, col = 0;
-    const cellW = 22, cellH = 30;
-    const cols = Math.floor((W - RX - 40) / cellW);
-    const rows = Math.floor(H / cellH);
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const ch = chars[(r * cols + c) % chars.length];
-        ctx.fillText(ch, RX + c * cellW, 20 + r * cellH);
-      }
-    }
+    // ── Footer CTA — centered ─────────────────────────────────────────────────
+    const footerY = H - 46;
 
-    // ── footer ───────────────────────────────────────────────────────────────
-    const footerY = H - 44;
-
-    // Thin divider
-    ctx.strokeStyle = hexToRgba(border, 0.6);
+    // Divider
+    ctx.strokeStyle = hexToRgba(inkFaint, 0.15);
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(PAD, footerY - 16);
-    ctx.lineTo(W * 0.62, footerY - 16);
+    ctx.moveTo(64, footerY - 12);
+    ctx.lineTo(W - 64, footerY - 12);
     ctx.stroke();
 
     ctx.font = '400 14px sans-serif';
     ctx.fillStyle = inkFaint;
-    ctx.textBaseline = 'top';
-    ctx.fillText('keypace.io', PAD, footerY);
+    ctx.textAlign = 'center';
+    ctx.fillText('Can you beat this? Try at  keypace.io', CX, footerY);
 
-    const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    ctx.fillText('·  ' + dateStr, PAD + ctx.measureText('keypace.io').width + 4, footerY);
+    // Highlight the URL
+    const preText = 'Can you beat this? Try at  ';
+    ctx.font = '600 14px monospace';
+    ctx.fillStyle = accent;
+    ctx.textAlign = 'left';
+    const preW = (() => {
+      ctx.font = '400 14px sans-serif';
+      return ctx.measureText(preText).width;
+    })();
+    const fullW = (() => {
+      ctx.font = '400 14px sans-serif';
+      return ctx.measureText('Can you beat this? Try at  keypace.io').width;
+    })();
+    ctx.font = '600 14px monospace';
+    ctx.fillStyle = accent;
+    ctx.fillText('keypace.io', CX - fullW / 2 + preW, footerY);
   }
 
   // Helper — rounded rect path (not available natively in all canvas contexts)
@@ -4739,6 +4798,18 @@ COACHING GUIDELINES:
 
   let lastResultData = null;
 
+  function openShareFromHistory(h) {
+    // Populate lastResultData so the native share and download buttons work
+    lastResultData = {
+      wpm: h.wpm, acc: h.acc, raw: h.raw || h.wpm,
+      mode: h.mode, val: h.val, date: h.date
+    };
+    drawShareCard(h.wpm, h.acc, h.raw || h.wpm, h.mode, h.val, h.date);
+    document.getElementById('shareModal').classList.add('show');
+    const nativeBtn = document.getElementById('shareNativeBtn');
+    nativeBtn.style.display = navigator.share ? 'flex' : 'none';
+  }
+
   function getShareText(wpm, acc, mode, val) {
     const modeLabel = mode === 'daily' ? 'daily challenge' : mode === 'time' ? `${val}s test` : `${val} word test`;
     return `I just scored ${wpm} WPM with ${acc}% accuracy on the keypace ${modeLabel}! Can you beat it? 🎯`;
@@ -4747,7 +4818,7 @@ COACHING GUIDELINES:
   document.getElementById('shareBtn').addEventListener('click', () => {
     if (!lastResultData) return;
     const { wpm, acc, raw, mode, val } = lastResultData;
-    drawShareCard(wpm, acc, raw, mode, val);
+    drawShareCard(wpm, acc, raw, mode, val, lastResultData.date);
     document.getElementById('shareModal').classList.add('show');
 
     // Show native share button only if Web Share API supports files
