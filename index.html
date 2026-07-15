@@ -3440,56 +3440,43 @@
     ctx.stroke();
 
     // ── Hover interaction ─────────────────────────────────────────────────
-    // Remove any existing listener before adding a new one
-    const newCanvas = canvas.cloneNode(false);
-    canvas.parentNode.replaceChild(newCanvas, canvas);
-    // Redraw on the new canvas (already done above) — now wire events
-    newCanvas.style.cursor = 'crosshair';
+    // Track listener references so we can remove the old one on redraw
+    // without cloneNode (which wipes the canvas drawing).
+    if (canvas._mmove) canvas.removeEventListener('mousemove', canvas._mmove);
+    if (canvas._mleave) canvas.removeEventListener('mouseleave', canvas._mleave);
+    canvas.style.cursor = 'crosshair';
 
-    newCanvas.addEventListener('mousemove', (e) => {
-      const rect = newCanvas.getBoundingClientRect();
+    canvas._mmove = (e) => {
+      const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
 
-      // Find the nearest data point
-      let closest = 0;
-      let closestDist = Infinity;
+      let closest = 0, closestDist = Infinity;
       hist.forEach((h, i) => {
         const dist = Math.abs(xFor(i) - mouseX);
         if (dist < closestDist) { closestDist = dist; closest = i; }
       });
 
-      if (closestDist > PW / n + 10) {
+      if (closestDist > PW / n + 10 || mouseX < L || mouseX > L + PW) {
         tooltip.classList.remove('show');
         return;
       }
 
       const h = hist[closest];
-
-      tooltip.innerHTML = `
-        <div><strong>${h.t}s</strong> into test</div>
-        <div>wpm <strong>${h.wpm}</strong> &nbsp; raw <strong>${h.raw}</strong></div>
-      `;
+      tooltip.innerHTML = `<div style="font-weight:600;color:var(--accent);margin-bottom:3px">${h.t}s into test</div><div>wpm <strong>${h.wpm}</strong> &nbsp;·&nbsp; raw <strong>${h.raw}</strong></div>`;
       tooltip.classList.add('show');
 
-      // Position tooltip — flip left if near right edge
-      const tipW = tooltip.offsetWidth || 120;
-      const tipH = tooltip.offsetHeight || 50;
-      const boxW = newCanvas.parentElement.offsetWidth;
-      let left = xFor(closest) + L + 12;
-      if (left + tipW > boxW - 8) left = xFor(closest) + L - tipW - 12;
-      let top = Math.max(T, yFor(h.wpm) - tipH / 2);
+      const tipW = tooltip.offsetWidth || 130;
+      const tipH = tooltip.offsetHeight || 52;
+      const boxW = box.offsetWidth;
+      let left = xFor(closest) + 12;
+      if (left + tipW > boxW - 8) left = xFor(closest) - tipW - 12;
       tooltip.style.left = left + 'px';
-      tooltip.style.top = top + 'px';
+      tooltip.style.top = Math.max(0, yFor(h.wpm) - tipH / 2) + 'px';
+    };
 
-      // Draw crosshair on hover by redrawing (lightweight — just a vertical line)
-      // We do this by using a second overlay canvas approach — simpler to just
-      // draw an indicator circle on the main canvas via a temporary overlay div
-    });
-
-    newCanvas.addEventListener('mouseleave', () => {
-      tooltip.classList.remove('show');
-    });
+    canvas._mleave = () => tooltip.classList.remove('show');
+    canvas.addEventListener('mousemove', canvas._mmove);
+    canvas.addEventListener('mouseleave', canvas._mleave);
   }
 
   // ---------------- theme picker ----------------
