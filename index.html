@@ -2890,7 +2890,8 @@
     document.getElementById('resChars').textContent = state.typed.length;
     document.getElementById('resTime').textContent = Math.round(elapsedSec) + 's';
 
-    drawChart();
+    // drawChart needs the result panel to be visible first so the canvas
+    // can measure its actual rendered width — defer one frame after show.
 
     // ---- personal best handling ----
     const key = bestKeyFor(state.mode, state.val);
@@ -2951,6 +2952,10 @@
     restartRow.classList.add('hide');
     result.classList.add('show');
     coachFab.classList.add('visible');
+
+    // Draw chart after the result panel is visible — clientWidth is 0
+    // until the element is actually rendered, so we wait one frame.
+    requestAnimationFrame(() => drawChart());
 
     // ---- daily comparison ----
     if (state.mode === 'daily') {
