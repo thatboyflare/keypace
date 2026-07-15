@@ -361,6 +361,40 @@
 
   .font-panel { width: 200px; }
 
+  .account-panel { width: 280px; }
+
+  .account-user-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0 8px;
+  }
+  .account-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .account-email {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink-dim);
+    word-break: break-all;
+  }
+
+  /* Glow on account button when signed in */
+  .icon-btn.account-active {
+    color: var(--accent);
+  }
+
   /* ---------- sync panel ---------- */
   .sync-panel {
     width: 280px;
@@ -1532,6 +1566,7 @@
     .theme-panel { width: 200px; right: -40px; }
     .font-panel { width: 180px; right: -40px; }
     .sync-panel { width: 250px; right: -60px; }
+    .account-panel { width: 250px; right: -60px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1947,6 +1982,32 @@
       <button class="icon-btn" id="perfBtn" title="Performance history" aria-label="Performance history">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
       </button>
+      <div class="theme-picker-wrap">
+        <button class="icon-btn" id="accountBtn" title="Account" aria-label="Account">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        </button>
+        <div class="theme-panel account-panel" id="accountPanel">
+          <div id="accountSignedOut">
+            <div class="theme-panel-title">sign in to sync stats</div>
+            <p class="sync-copy" style="margin-bottom:10px;">Enter your email — we'll send a magic link. No password needed.</p>
+            <input type="email" id="accountEmail" class="sync-code-input" placeholder="you@example.com" autocomplete="email" />
+            <button class="btn primary sync-action-btn" id="accountSendBtn">send magic link</button>
+            <div class="sync-result" id="accountResult"></div>
+          </div>
+          <div id="accountSignedIn" style="display:none">
+            <div class="theme-panel-title">account</div>
+            <div class="account-user-row">
+              <div class="account-avatar" id="accountAvatar"></div>
+              <div class="account-email" id="accountEmail2"></div>
+            </div>
+            <div class="sync-result show success" id="accountSyncStatus"></div>
+            <div style="display:flex;gap:8px;margin-top:10px;">
+              <button class="btn sync-action-btn" id="accountSyncNowBtn" style="flex:1;justify-content:center;">sync now</button>
+              <button class="btn sync-action-btn" id="accountSignOutBtn" style="flex:1;justify-content:center;">sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="theme-picker-wrap">
         <button class="icon-btn" id="themeBtn" title="Color theme" aria-label="Color theme">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C22 6.012 17.461 2 12 2z"></path></svg>
@@ -2992,6 +3053,9 @@
 
     // ---- auto insight ----
     generateAutoInsight(wpm, accClamped, raw);
+
+    // Auto-push updated stats if signed in
+    if (authSession) pushStats().catch(() => {});
   }
 
   function renderHistory() {
@@ -3602,6 +3666,7 @@
   themeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     closeFontPanel();
+    closeAccountPanel();
     themePanel.classList.contains('show') ? closeThemePanel() : openThemePanel();
   });
 
@@ -3691,6 +3756,7 @@
   fontBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     closeThemePanel();
+    closeAccountPanel();
     fontPanel.classList.contains('show') ? closeFontPanel() : openFontPanel();
   });
 
@@ -4116,6 +4182,278 @@
   });
 
   window.addEventListener('resize', () => { cachedLineHeight = null; updateCaret(true); });
+
+  // ---------------- account / auth ----------------
+  const AUTH_URL   = `${SUPABASE_URL}/auth/v1`;
+  const STATS_URL  = `${SUPABASE_URL}/rest/v1/user_stats`;
+  const SESSION_KEY = 'keypace_session_v1';
+
+  let authSession = null; // { access_token, user: { email } }
+
+  function authHeaders() {
+    return {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${authSession ? authSession.access_token : SUPABASE_KEY}`,
+    };
+  }
+
+  function saveSession(s) {
+    authSession = s;
+    try { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch {}
+  }
+
+  function clearSession() {
+    authSession = null;
+    try { localStorage.removeItem(SESSION_KEY); } catch {}
+  }
+
+  function loadSession() {
+    try {
+      const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+      if (s && s.access_token) authSession = s;
+    } catch {}
+  }
+
+  // Send magic link
+  async function sendMagicLink(email) {
+    const res = await fetch(`${AUTH_URL}/otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
+      body: JSON.stringify({ email, create_user: true }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error_description || err.msg || `Error ${res.status}`);
+    }
+  }
+
+  // Verify a token from the URL hash (after user clicks magic link)
+  async function verifyToken(token, type) {
+    const res = await fetch(`${AUTH_URL}/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
+      body: JSON.stringify({ token, type, gotrue_meta_security: {} }),
+    });
+    if (!res.ok) throw new Error('Invalid or expired link.');
+    return res.json();
+  }
+
+  // Refresh an existing session token
+  async function refreshSession(refreshToken) {
+    const res = await fetch(`${AUTH_URL}/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!res.ok) throw new Error('Session expired');
+    return res.json();
+  }
+
+  // Push local stats to Supabase
+  async function pushStats() {
+    if (!authSession) return;
+    const payload = {
+      user_id: authSession.user.id,
+      bests: bests,
+      history: history.slice(0, 200), // cap to avoid huge payloads
+      updated_at: new Date().toISOString(),
+    };
+    const res = await fetch(STATS_URL, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new Error(`Push failed (${res.status}): ${txt}`);
+    }
+  }
+
+  // Pull stats from Supabase and merge into local
+  async function pullStats() {
+    if (!authSession) return false;
+    const res = await fetch(`${STATS_URL}?user_id=eq.${authSession.user.id}&select=bests,history`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`Pull failed (${res.status})`);
+    const rows = await res.json();
+    if (!rows.length) return false; // no remote data yet
+
+    const remote = rows[0];
+
+    // Merge bests — keep higher WPM per key
+    let changed = false;
+    Object.entries(remote.bests || {}).forEach(([key, rb]) => {
+      if (!bests[key] || rb.wpm > bests[key].wpm) {
+        bests[key] = rb;
+        changed = true;
+      }
+    });
+
+    // Merge history — union by date, newest first, capped at 500
+    const seen = new Set(history.map(h => h.date));
+    (remote.history || []).forEach(h => {
+      if (!seen.has(h.date)) { history.push(h); seen.add(h.date); changed = true; }
+    });
+    history.sort((a, b) => b.date - a.date);
+    history = history.slice(0, 500);
+
+    if (changed) {
+      saveJSON(BESTS_KEY, bests);
+      saveJSON(HISTORY_KEY, history);
+      renderHistory();
+      refreshBestBadge();
+    }
+    return true;
+  }
+
+  // Update the account panel UI
+  function updateAccountUI() {
+    const signedOut = document.getElementById('accountSignedOut');
+    const signedIn  = document.getElementById('accountSignedIn');
+    const btn = document.getElementById('accountBtn');
+
+    if (authSession) {
+      signedOut.style.display = 'none';
+      signedIn.style.display = '';
+      const email = authSession.user.email || '';
+      document.getElementById('accountEmail2').textContent = email;
+      document.getElementById('accountAvatar').textContent = email.charAt(0).toUpperCase();
+      document.getElementById('accountSyncStatus').textContent = 'Signed in — stats sync automatically.';
+      btn.classList.add('account-active');
+    } else {
+      signedOut.style.display = '';
+      signedIn.style.display = 'none';
+      btn.classList.remove('account-active');
+    }
+  }
+
+  // Handle magic link redirect — Supabase appends #access_token=... to the URL
+  async function handleAuthRedirect() {
+    const hash = window.location.hash;
+    if (!hash.includes('access_token')) return;
+
+    const params = new URLSearchParams(hash.slice(1));
+    const accessToken  = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    const type         = params.get('type');
+
+    if (!accessToken) return;
+
+    // Clean the hash from the URL without a page reload
+    window.history.replaceState(null, '', window.location.pathname);
+
+    // Get the user object
+    const userRes = await fetch(`${AUTH_URL}/user`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${accessToken}` },
+    });
+    if (!userRes.ok) return;
+    const user = await userRes.json();
+
+    saveSession({ access_token: accessToken, refresh_token: refreshToken, user });
+    updateAccountUI();
+
+    // Pull remote stats on first sign-in
+    const status = document.getElementById('accountSyncStatus');
+    try {
+      status.textContent = 'Syncing stats…';
+      await pullStats();
+      await pushStats(); // also push any local data we have
+      status.textContent = 'Signed in — stats sync automatically.';
+      status.className = 'sync-result show success';
+    } catch (e) {
+      status.textContent = 'Signed in, but sync failed: ' + e.message;
+      status.className = 'sync-result show error';
+    }
+  }
+
+  // ── Wire up account panel ──────────────────────────────────────────────────
+  const accountBtn   = document.getElementById('accountBtn');
+  const accountPanel = document.getElementById('accountPanel');
+
+  function openAccountPanel() { renderThemeGrid(); accountPanel.classList.add('show'); }
+  function closeAccountPanel() { accountPanel.classList.remove('show'); }
+
+  accountBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeThemePanel(); closeFontPanel(); closeSyncPanel();
+    accountPanel.classList.contains('show') ? closeAccountPanel() : openAccountPanel();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!accountPanel.classList.contains('show')) return;
+    if (e.target.closest('.theme-picker-wrap')) return;
+    closeAccountPanel();
+  });
+
+  document.getElementById('accountSendBtn').addEventListener('click', async () => {
+    const email = document.getElementById('accountEmail').value.trim();
+    const result = document.getElementById('accountResult');
+    if (!email || !email.includes('@')) {
+      result.textContent = 'Please enter a valid email address.';
+      result.className = 'sync-result show error';
+      return;
+    }
+    document.getElementById('accountSendBtn').disabled = true;
+    result.textContent = 'Sending magic link…';
+    result.className = 'sync-result show loading';
+    try {
+      await sendMagicLink(email);
+      result.textContent = `Magic link sent to ${email} — check your inbox and click the link to sign in.`;
+      result.className = 'sync-result show success';
+    } catch (e) {
+      result.textContent = e.message || 'Something went wrong. Try again.';
+      result.className = 'sync-result show error';
+      document.getElementById('accountSendBtn').disabled = false;
+    }
+  });
+
+  document.getElementById('accountEmail').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('accountSendBtn').click();
+  });
+
+  document.getElementById('accountSyncNowBtn').addEventListener('click', async () => {
+    const status = document.getElementById('accountSyncStatus');
+    status.textContent = 'Syncing…';
+    status.className = 'sync-result show loading';
+    try {
+      await pullStats();
+      await pushStats();
+      status.textContent = 'All synced!';
+      status.className = 'sync-result show success';
+    } catch (e) {
+      status.textContent = 'Sync failed: ' + e.message;
+      status.className = 'sync-result show error';
+    }
+  });
+
+  document.getElementById('accountSignOutBtn').addEventListener('click', async () => {
+    // Tell Supabase to invalidate the session
+    if (authSession) {
+      await fetch(`${AUTH_URL}/logout`, {
+        method: 'POST',
+        headers: authHeaders(),
+      }).catch(() => {});
+    }
+    clearSession();
+    updateAccountUI();
+    closeAccountPanel();
+  });
+
+  // Push stats automatically after each test finishes
+  const _origShowResults = showResults;
+  // (stats push is added directly in the existing showResults flow below)
+
+  // ── Init auth ─────────────────────────────────────────────────────────────
+  loadSession();
+  updateAccountUI();
+  handleAuthRedirect(); // handles the magic link click-through
+
+  // Auto-sync on page load if already signed in
+  if (authSession) {
+    pullStats().then(() => pushStats()).catch(() => {});
+  }
 
   // ---------------- caps lock warning ----------------
   const capslockWarning = document.getElementById('capslockWarning');
