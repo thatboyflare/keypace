@@ -2206,6 +2206,10 @@
     </div>
     <canvas id="shareCanvas" width="1200" height="630" style="width:100%;border-radius:10px;display:block;"></canvas>
     <div class="share-modal-actions">
+      <button class="btn primary" id="shareNativeBtn" style="display:none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+        share
+      </button>
       <button class="btn primary" id="shareDownloadBtn">download image</button>
       <button class="btn" id="shareCopyBtn">copy image</button>
     </div>
@@ -4735,11 +4739,21 @@ COACHING GUIDELINES:
 
   let lastResultData = null;
 
+  function getShareText(wpm, acc, mode, val) {
+    const modeLabel = mode === 'daily' ? 'daily challenge' : mode === 'time' ? `${val}s test` : `${val} word test`;
+    return `I just scored ${wpm} WPM with ${acc}% accuracy on the keypace ${modeLabel}! Can you beat it? 🎯`;
+  }
+
   document.getElementById('shareBtn').addEventListener('click', () => {
     if (!lastResultData) return;
     const { wpm, acc, raw, mode, val } = lastResultData;
     drawShareCard(wpm, acc, raw, mode, val);
     document.getElementById('shareModal').classList.add('show');
+
+    // Show native share button only if Web Share API supports files
+    // (it does on modern mobile browsers and some desktop ones)
+    const nativeBtn = document.getElementById('shareNativeBtn');
+    nativeBtn.style.display = navigator.share ? 'flex' : 'none';
   });
 
   document.getElementById('shareModalCloseBtn').addEventListener('click', () => {
@@ -4750,6 +4764,36 @@ COACHING GUIDELINES:
     if (e.target === document.getElementById('shareModal')) {
       document.getElementById('shareModal').classList.remove('show');
     }
+  });
+
+  document.getElementById('shareNativeBtn').addEventListener('click', async () => {
+    const canvas = document.getElementById('shareCanvas');
+    const { wpm, acc, mode, val } = lastResultData;
+    const text = getShareText(wpm, acc, mode, val);
+    const url = 'https://keypace.io';
+
+    canvas.toBlob(async (blob) => {
+      const file = new File([blob], `keypace-${wpm}wpm.png`, { type: 'image/png' });
+      try {
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          // Share image + text + link together
+          await navigator.share({ files: [file], text, url });
+        } else {
+          // Fallback: share just text + link (no image)
+          await navigator.share({ text, url });
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          // User didn't cancel — share failed, fall back to copy
+          try {
+            await navigator.clipboard.writeText(`${text}\n${url}`);
+            const btn = document.getElementById('shareNativeBtn');
+            btn.textContent = 'link copied!';
+            setTimeout(() => btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg> share`, 2000);
+          } catch {}
+        }
+      }
+    });
   });
 
   document.getElementById('shareDownloadBtn').addEventListener('click', () => {
