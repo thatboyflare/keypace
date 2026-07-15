@@ -1003,6 +1003,83 @@
     animation: caretblink 1s steps(1) infinite;
   }
 
+  /* ---------- daily comparison ---------- */
+  .daily-comparison {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    animation: rise 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    gap: 14px;
+    flex-direction: column;
+  }
+  .daily-comparison.show { display: flex; }
+
+  .dc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .dc-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    color: var(--ink-dim);
+    font-family: var(--font-ui);
+  }
+  .dc-streak {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink-dim);
+    font-weight: 600;
+  }
+
+  .dc-chart-wrap {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .dc-chart-wrap svg { width: 100%; height: 120px; overflow: visible; display: block; }
+
+  .dc-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .dc-stat {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .dc-stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--ink-faint);
+    font-family: var(--font-ui);
+    font-weight: 600;
+  }
+  .dc-stat-value {
+    font-family: var(--font-mono);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .dc-stat-value.highlight { color: var(--accent); }
+  .dc-stat-sub {
+    font-size: 11px;
+    color: var(--ink-faint);
+    font-family: var(--font-ui);
+  }
+
   .history-strip {
     display: flex;
     align-items: center;
@@ -1964,6 +2041,17 @@
         <div class="ai-insight-text" id="autoInsightText"></div>
       </div>
 
+      <div class="daily-comparison" id="dailyComparison">
+        <div class="dc-header">
+          <span class="dc-title">your daily history</span>
+          <span class="dc-streak" id="dcStreak"></span>
+        </div>
+        <div class="dc-chart-wrap">
+          <svg id="dcChartSvg" viewBox="0 0 600 120" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="dc-stats" id="dcStats"></div>
+      </div>
+
       <div class="history-strip" id="historyStrip"></div>
     </div>
   </main>
@@ -2364,6 +2452,7 @@
     liveWpmEl.classList.remove('show');
     result.classList.remove('show');
     autoInsightEl.classList.remove('show');
+    document.getElementById('dailyComparison').classList.remove('show');
     autoInsightText.textContent = '';
     coachFab.classList.add('visible');
     if (coachOverlay) coachOverlay.classList.remove('show');
@@ -2817,6 +2906,13 @@
     restartRow.classList.add('hide');
     result.classList.add('show');
     coachFab.classList.add('visible');
+
+    // ---- daily comparison ----
+    if (state.mode === 'daily') {
+      renderDailyComparison();
+    } else {
+      document.getElementById('dailyComparison').classList.remove('show');
+    }
 
     // ---- auto insight ----
     generateAutoInsight(wpm, accClamped, raw);
@@ -4032,6 +4128,7 @@ COACHING GUIDELINES:
 
   // ---------------- daily challenge + streak ----------------
   const DAILY_KEY = 'keypace_daily_v1';
+  const DAILY_HISTORY_KEY = 'keypace_daily_hist_v1';
   const STREAK_KEY = 'keypace_streak_v1';
 
   function getDailyDateStr() {
@@ -4076,6 +4173,14 @@ COACHING GUIDELINES:
     try { localStorage.setItem(DAILY_KEY, JSON.stringify(data)); } catch {}
   }
 
+  function loadDailyHistory() {
+    try { return JSON.parse(localStorage.getItem(DAILY_HISTORY_KEY) || '[]'); } catch { return []; }
+  }
+
+  function saveDailyHistory(data) {
+    try { localStorage.setItem(DAILY_HISTORY_KEY, JSON.stringify(data)); } catch {}
+  }
+
   function loadStreak() {
     try { return JSON.parse(localStorage.getItem(STREAK_KEY) || '{"count":0,"lastDate":""}'); } catch { return { count: 0, lastDate: '' }; }
   }
@@ -4098,6 +4203,17 @@ COACHING GUIDELINES:
     const today = getDailyDateStr();
     saveDailyState({ date: today, wpm, acc });
 
+    // Append to the daily history log (one entry per day, newest first)
+    const dailyHist = loadDailyHistory();
+    const existing = dailyHist.findIndex(h => h.date === today);
+    if (existing >= 0) {
+      // Update today's entry if it already exists (e.g. user retried)
+      dailyHist[existing] = { date: today, wpm, acc };
+    } else {
+      dailyHist.unshift({ date: today, wpm, acc });
+    }
+    saveDailyHistory(dailyHist.slice(0, 90)); // keep up to 90 days
+
     const streak = loadStreak();
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -4117,6 +4233,121 @@ COACHING GUIDELINES:
   }
 
   updateStreakBadge();
+
+  function renderDailyComparison() {
+    const panel = document.getElementById('dailyComparison');
+    const dailyHist = loadDailyHistory();
+
+    if (dailyHist.length < 1) { panel.classList.remove('show'); return; }
+    panel.classList.add('show');
+
+    // Streak in comparison header
+    const streak = loadStreak();
+    document.getElementById('dcStreak').textContent =
+      streak.count > 1 ? `🔥 ${streak.count} day streak` :
+      streak.count === 1 ? '🔥 1 day streak' : '';
+
+    // Summary stats
+    const wpmValues = dailyHist.map(h => h.wpm);
+    const best = Math.max(...wpmValues);
+    const avg = Math.round(wpmValues.reduce((a, b) => a + b, 0) / wpmValues.length);
+    const today = dailyHist[0];
+    const prev = dailyHist[1];
+    const delta = prev ? today.wpm - prev.wpm : null;
+    const deltaStr = delta === null ? 'first run!' : (delta >= 0 ? `+${delta}` : `${delta}`);
+    const deltaClass = delta !== null && delta > 0 ? 'highlight' : '';
+
+    document.getElementById('dcStats').innerHTML = `
+      <div class="dc-stat">
+        <div class="dc-stat-label">today</div>
+        <div class="dc-stat-value highlight">${today.wpm}</div>
+        <div class="dc-stat-sub">${today.acc}% acc</div>
+      </div>
+      <div class="dc-stat">
+        <div class="dc-stat-label">vs yesterday</div>
+        <div class="dc-stat-value ${deltaClass}">${deltaStr}</div>
+        <div class="dc-stat-sub">wpm</div>
+      </div>
+      <div class="dc-stat">
+        <div class="dc-stat-label">personal best</div>
+        <div class="dc-stat-value">${best}</div>
+        <div class="dc-stat-sub">avg ${avg} wpm</div>
+      </div>
+    `;
+
+    // Trend chart — last 14 days, oldest first
+    const svg = document.getElementById('dcChartSvg');
+    svg.innerHTML = '';
+    const points = dailyHist.slice(0, 14).slice().reverse();
+    if (!points.length) return;
+
+    const W = 600, H = 120, PAD = 10;
+    const accent = themeVar('--accent');
+    const inkFaint = themeVar('--ink-faint');
+    const maxWpm = Math.max(...points.map(p => p.wpm)) * 1.2 || 1;
+    const xFor = i => points.length === 1 ? W / 2 : PAD + (i / (points.length - 1)) * (W - PAD * 2);
+    const yFor = v => H - 20 - (v / maxWpm) * (H - 30);
+
+    // Grid lines
+    [0.5, 1].forEach(f => {
+      const y = H - 20 - f * (H - 30);
+      const gl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      gl.setAttribute('x1', PAD); gl.setAttribute('x2', W - PAD);
+      gl.setAttribute('y1', y); gl.setAttribute('y2', y);
+      gl.setAttribute('stroke', hexToRgba(inkFaint, 0.12));
+      gl.setAttribute('stroke-width', '1');
+      svg.appendChild(gl);
+    });
+
+    // Area + line
+    if (points.length > 1) {
+      const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i)} ${yFor(p.wpm)}`).join(' ');
+      const area = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      area.setAttribute('d', linePath + ` L ${xFor(points.length-1)} ${H-20} L ${xFor(0)} ${H-20} Z`);
+      area.setAttribute('fill', hexToRgba(accent, 0.08));
+      svg.appendChild(area);
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', linePath);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', accent);
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      svg.appendChild(path);
+    }
+
+    // Dots, WPM labels, date labels
+    const todayStr = getDailyDateStr();
+    points.forEach((p, i) => {
+      const cx = xFor(i), cy = yFor(p.wpm);
+      const isToday = p.date === todayStr;
+
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+      circle.setAttribute('r', isToday ? 5 : 3.5);
+      circle.setAttribute('fill', accent);
+      if (!isToday) circle.setAttribute('opacity', '0.55');
+      svg.appendChild(circle);
+
+      const wLbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      wLbl.setAttribute('x', cx); wLbl.setAttribute('y', cy - 8);
+      wLbl.setAttribute('text-anchor', 'middle');
+      wLbl.setAttribute('font-size', '10');
+      wLbl.setAttribute('fill', isToday ? accent : inkFaint);
+      wLbl.setAttribute('font-weight', isToday ? '700' : '400');
+      wLbl.textContent = p.wpm;
+      svg.appendChild(wLbl);
+
+      const d = new Date(p.date + 'T12:00:00');
+      const dLbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      dLbl.setAttribute('x', cx); dLbl.setAttribute('y', H - 2);
+      dLbl.setAttribute('text-anchor', 'middle');
+      dLbl.setAttribute('font-size', '9');
+      dLbl.setAttribute('fill', isToday ? accent : inkFaint);
+      dLbl.textContent = isToday ? 'today' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      svg.appendChild(dLbl);
+    });
+  }
 
   // ---------------- code snippet mode ----------------
   const CODE_SNIPPETS = [
