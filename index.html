@@ -726,6 +726,24 @@
   }
   .field.blurred { filter: blur(6px); opacity: 0.6; }
 
+  .capslock-warning {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--bg);
+    background: var(--error);
+    padding: 6px 12px;
+    border-radius: 20px;
+    width: fit-content;
+    animation: rise 0.2s ease;
+    user-select: none;
+  }
+  .capslock-warning.show { display: flex; }
+
   /* Plain divs never trigger a mobile on-screen keyboard, only real form
      fields do. This input exists purely so tapping the test area can focus
      a genuine <input>, which is what actually summons the keyboard on iOS
@@ -2008,6 +2026,10 @@
       </div>
 
       <div class="field" id="field" tabindex="0"></div>
+      <div class="capslock-warning" id="capslockWarning">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+        caps lock is on
+      </div>
       <input
         id="mobileInput"
         class="mobile-input"
@@ -3920,6 +3942,29 @@
   renderHistory();
 
   // ---------------- mode switching ----------------
+  const MODE_KEY = 'keypace_mode_v1';
+
+  function saveMode(mode, val) {
+    try { localStorage.setItem(MODE_KEY, JSON.stringify({ mode, val })); } catch {}
+  }
+
+  function loadMode() {
+    try { return JSON.parse(localStorage.getItem(MODE_KEY) || 'null'); } catch { return null; }
+  }
+
+  // Restore last-used mode on page load
+  const savedMode = loadMode();
+  if (savedMode && savedMode.mode) {
+    state.mode = savedMode.mode;
+    state.val = savedMode.val || 30;
+    // Sync the active button in the nav
+    modesNav.querySelectorAll('button').forEach(b => {
+      const matches = b.dataset.mode === savedMode.mode &&
+        (parseInt(b.dataset.val, 10) || 0) === (savedMode.val || 0);
+      b.classList.toggle('active', matches);
+    });
+  }
+
   modesNav.addEventListener('click', (e) => {
     const btn = e.target.closest('button');
     if (!btn || !btn.dataset.mode) return;
@@ -3927,6 +3972,7 @@
     btn.classList.add('active');
     state.mode = btn.dataset.mode;
     state.val = parseInt(btn.dataset.val, 10) || 0;
+    saveMode(state.mode, state.val);
     buildTest();
     focusInput();
   });
@@ -4034,6 +4080,20 @@
   });
 
   window.addEventListener('resize', () => { cachedLineHeight = null; updateCaret(true); });
+
+  // ---------------- caps lock warning ----------------
+  const capslockWarning = document.getElementById('capslockWarning');
+
+  function updateCapsLock(e) {
+    // getModifierState is the only reliable cross-browser way to detect
+    // Caps Lock state — checking e.key === 'CapsLock' alone only fires
+    // on the toggle press itself, not on every subsequent keypress.
+    const on = e.getModifierState && e.getModifierState('CapsLock');
+    capslockWarning.classList.toggle('show', !!on);
+  }
+
+  document.addEventListener('keydown', updateCapsLock);
+  document.addEventListener('keyup', updateCapsLock);
 
   // global tab/escape capture even if focus elsewhere
   document.addEventListener('keydown', (e) => {
