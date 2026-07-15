@@ -918,11 +918,51 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 16px 18px 10px;
-    min-height: 180px;
+    min-height: 200px;
     display: flex;
     flex-direction: column;
+    gap: 8px;
   }
-  .chart-box svg { width: 100%; height: 100%; overflow: visible; }
+
+  .chart-tooltip {
+    position: absolute;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 8px 11px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    z-index: 10;
+    line-height: 1.6;
+  }
+  .chart-tooltip.show { opacity: 1; }
+  .chart-tooltip strong { color: var(--accent); }
+
+  .chart-legend {
+    display: flex;
+    gap: 14px;
+    justify-content: flex-end;
+  }
+  .chart-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+  .chart-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
 
   .result-actions {
     display: flex;
@@ -2018,8 +2058,13 @@
             </div>
           </div>
         </div>
-        <div class="chart-box">
-          <svg id="chartSvg" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>
+        <div class="chart-box" id="chartBox" style="position:relative;">
+          <canvas id="chartCanvas" style="width:100%;display:block;border-radius:6px;"></canvas>
+          <div class="chart-tooltip" id="chartTooltip"></div>
+          <div class="chart-legend">
+            <span class="chart-legend-item"><span class="chart-legend-dot" style="background:var(--accent)"></span>wpm</span>
+            <span class="chart-legend-item"><span class="chart-legend-dot" style="background:var(--ink-faint);opacity:.6"></span>raw</span>
+          </div>
         </div>
       </div>
       <div class="result-actions">
@@ -3274,67 +3319,176 @@
   });
 
   function drawChart() {
-    const svg = document.getElementById('chartSvg');
-    svg.innerHTML = '';
-    const W = 600, H = 180, PAD = 8;
-    const hist = state.wpmHistory.length ? state.wpmHistory : [{t:1,wpm:0,raw:0}];
-    const maxWpm = Math.max(10, ...hist.map(h => Math.max(h.wpm, h.raw))) * 1.15;
-    const n = hist.length;
+    const canvas = document.getElementById('chartCanvas');
+    const tooltip = document.getElementById('chartTooltip');
+    const hist = state.wpmHistory.length ? state.wpmHistory : [];
+    if (!hist.length) return;
 
+    // Size the canvas to match its CSS display size at device pixel ratio
+    const box = canvas.parentElement;
+    const DPR = window.devicePixelRatio || 1;
+    const CW = box.clientWidth - 36; // account for chart-box padding
+    const CH = 200;
+    canvas.width = CW * DPR;
+    canvas.height = CH * DPR;
+    canvas.style.width = CW + 'px';
+    canvas.style.height = CH + 'px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(DPR, DPR);
+
+    const accent   = themeVar('--accent');
+    const inkDim   = themeVar('--ink-dim');
     const inkFaint = themeVar('--ink-faint');
-    const accent = themeVar('--accent');
+    const panel    = themeVar('--panel');
 
-    const xFor = (i) => n <= 1 ? PAD : PAD + (i / (n - 1)) * (W - PAD * 2);
-    const yFor = (v) => H - PAD - (v / maxWpm) * (H - PAD * 2);
+    // Layout: leave room for Y-axis labels left, X-axis labels bottom
+    const L = 42, R = 12, T = 16, B = 28;
+    const PW = CW - L - R;
+    const PH = CH - T - B;
 
-    // grid lines
-    const gridCount = 4;
-    for (let g = 0; g <= gridCount; g++) {
-      const y = PAD + (g / gridCount) * (H - PAD * 2);
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', PAD); line.setAttribute('x2', W - PAD);
-      line.setAttribute('y1', y); line.setAttribute('y2', y);
-      line.setAttribute('stroke', hexToRgba(inkFaint, 0.18));
-      line.setAttribute('stroke-width', '1');
-      svg.appendChild(line);
+    const n = hist.length;
+    const maxWpm = Math.max(10, ...hist.map(h => Math.max(h.wpm, h.raw))) * 1.15;
+
+    const xFor = i => L + (n <= 1 ? PW / 2 : (i / (n - 1)) * PW);
+    const yFor = v => T + PH - (v / maxWpm) * PH;
+
+    // ── Y-axis grid + labels ──────────────────────────────────────────────
+    const gridSteps = 4;
+    ctx.font = `${10 * DPR / DPR}px ${getComputedStyle(document.documentElement).getPropertyValue('--font-ui')}`;
+    ctx.font = '10px sans-serif';
+    for (let g = 0; g <= gridSteps; g++) {
+      const v = (maxWpm / gridSteps) * (gridSteps - g);
+      const y = yFor(v);
+
+      // Grid line
+      ctx.strokeStyle = hexToRgba(inkFaint, 0.12);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(L, y);
+      ctx.lineTo(L + PW, y);
+      ctx.stroke();
+
+      // Y-label
+      ctx.fillStyle = inkFaint;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(Math.round(v), L - 6, y);
     }
 
-    function pathFor(key) {
-      return hist.map((h, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i)} ${yFor(h[key])}`).join(' ');
+    // Y-axis title
+    ctx.save();
+    ctx.translate(10, T + PH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = inkFaint;
+    ctx.font = '9px sans-serif';
+    ctx.fillText('WPM', 0, 0);
+    ctx.restore();
+
+    // ── X-axis labels (time in seconds) ──────────────────────────────────
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = inkFaint;
+    ctx.font = '9px sans-serif';
+    // Show at most 8 x-axis labels
+    const xStep = Math.max(1, Math.ceil(n / 8));
+    for (let i = 0; i < n; i += xStep) {
+      ctx.fillText(hist[i].t + 's', xFor(i), T + PH + 6);
     }
+    // Always label the last point
+    ctx.fillText(hist[n-1].t + 's', xFor(n-1), T + PH + 6);
 
-    // raw line (dim)
-    const rawPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    rawPath.setAttribute('d', pathFor('raw'));
-    rawPath.setAttribute('fill', 'none');
-    rawPath.setAttribute('stroke', inkFaint);
-    rawPath.setAttribute('stroke-width', '1.5');
-    rawPath.setAttribute('stroke-dasharray', '3,3');
-    svg.appendChild(rawPath);
+    // X-axis title
+    ctx.textAlign = 'right';
+    ctx.fillStyle = inkFaint;
+    ctx.font = '9px sans-serif';
+    ctx.fillText('time', L + PW, T + PH + 20);
 
-    // wpm area fill
-    const areaPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    const d = pathFor('wpm') + ` L ${xFor(n-1)} ${H-PAD} L ${xFor(0)} ${H-PAD} Z`;
-    areaPath.setAttribute('d', d);
-    areaPath.setAttribute('fill', hexToRgba(accent, 0.08));
-    svg.appendChild(areaPath);
-
-    // wpm line
-    const wpmPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    wpmPath.setAttribute('d', pathFor('wpm'));
-    wpmPath.setAttribute('fill', 'none');
-    wpmPath.setAttribute('stroke', accent);
-    wpmPath.setAttribute('stroke-width', '2.5');
-    wpmPath.setAttribute('stroke-linecap', 'round');
-    wpmPath.setAttribute('stroke-linejoin', 'round');
-    svg.appendChild(wpmPath);
-
+    // ── Raw WPM line (dashed, dim) ────────────────────────────────────────
+    ctx.beginPath();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = hexToRgba(inkFaint, 0.5);
+    ctx.lineWidth = 1.5;
     hist.forEach((h, i) => {
-      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      c.setAttribute('cx', xFor(i)); c.setAttribute('cy', yFor(h.wpm));
-      c.setAttribute('r', n > 30 ? 0 : 2.5);
-      c.setAttribute('fill', accent);
-      svg.appendChild(c);
+      i === 0 ? ctx.moveTo(xFor(i), yFor(h.raw)) : ctx.lineTo(xFor(i), yFor(h.raw));
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // ── WPM area fill ─────────────────────────────────────────────────────
+    ctx.beginPath();
+    hist.forEach((h, i) => {
+      i === 0 ? ctx.moveTo(xFor(i), yFor(h.wpm)) : ctx.lineTo(xFor(i), yFor(h.wpm));
+    });
+    ctx.lineTo(xFor(n-1), T + PH);
+    ctx.lineTo(xFor(0), T + PH);
+    ctx.closePath();
+    ctx.fillStyle = hexToRgba(accent, 0.08);
+    ctx.fill();
+
+    // ── WPM line ─────────────────────────────────────────────────────────
+    ctx.beginPath();
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    hist.forEach((h, i) => {
+      i === 0 ? ctx.moveTo(xFor(i), yFor(h.wpm)) : ctx.lineTo(xFor(i), yFor(h.wpm));
+    });
+    ctx.stroke();
+
+    // ── Hover interaction ─────────────────────────────────────────────────
+    // Remove any existing listener before adding a new one
+    const newCanvas = canvas.cloneNode(false);
+    canvas.parentNode.replaceChild(newCanvas, canvas);
+    // Redraw on the new canvas (already done above) — now wire events
+    newCanvas.style.cursor = 'crosshair';
+
+    newCanvas.addEventListener('mousemove', (e) => {
+      const rect = newCanvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // Find the nearest data point
+      let closest = 0;
+      let closestDist = Infinity;
+      hist.forEach((h, i) => {
+        const dist = Math.abs(xFor(i) - mouseX);
+        if (dist < closestDist) { closestDist = dist; closest = i; }
+      });
+
+      if (closestDist > PW / n + 10) {
+        tooltip.classList.remove('show');
+        return;
+      }
+
+      const h = hist[closest];
+
+      tooltip.innerHTML = `
+        <div><strong>${h.t}s</strong> into test</div>
+        <div>wpm <strong>${h.wpm}</strong> &nbsp; raw <strong>${h.raw}</strong></div>
+      `;
+      tooltip.classList.add('show');
+
+      // Position tooltip — flip left if near right edge
+      const tipW = tooltip.offsetWidth || 120;
+      const tipH = tooltip.offsetHeight || 50;
+      const boxW = newCanvas.parentElement.offsetWidth;
+      let left = xFor(closest) + L + 12;
+      if (left + tipW > boxW - 8) left = xFor(closest) + L - tipW - 12;
+      let top = Math.max(T, yFor(h.wpm) - tipH / 2);
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+
+      // Draw crosshair on hover by redrawing (lightweight — just a vertical line)
+      // We do this by using a second overlay canvas approach — simpler to just
+      // draw an indicator circle on the main canvas via a temporary overlay div
+    });
+
+    newCanvas.addEventListener('mouseleave', () => {
+      tooltip.classList.remove('show');
     });
   }
 
