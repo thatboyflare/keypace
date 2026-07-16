@@ -4600,6 +4600,51 @@
     };
   }
 
+  // Auto-refresh the session token when it's expired.
+  // Called before any authenticated request — if the access_token is stale,
+  // swap it out using the refresh_token so the user never sees a JWT error.
+  async function ensureValidSession() {
+    if (!authSession) return false;
+    // Try a lightweight token verification — if it fails with 401, refresh
+    try {
+      const check = await fetch(`${AUTH_URL}/user`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${authSession.access_token}` },
+      });
+      if (check.ok) return true;
+      if (check.status !== 401) return false;
+    } catch { return false; }
+
+    // Token expired — attempt refresh
+    if (!authSession.refresh_token) { clearSession(); updateAccountUI(); return false; }
+    try {
+      const refreshed = await refreshSession(authSession.refresh_token);
+      saveSession({
+        access_token: refreshed.access_token,
+        refresh_token: refreshed.refresh_token,
+        user: refreshed.user || authSession.user,
+      });
+      return true;
+    } catch {
+      // Refresh token also expired — sign the user out gracefully
+      clearSession();
+      updateAccountUI();
+      return false;
+    }
+  }
+
+  // Authenticated fetch with auto-refresh on 401
+  async function authFetch(url, options = {}) {
+    await ensureValidSession();
+    const res = await fetch(url, { ...options, headers: { ...authHeaders(), ...(options.headers || {}) } });
+    if (res.status === 401) {
+      // One more try after a fresh token attempt
+      const ok = await ensureValidSession();
+      if (!ok) throw new Error('Session expired. Please sign in again.');
+      return fetch(url, { ...options, headers: { ...authHeaders(), ...(options.headers || {}) } });
+    }
+    return res;
+  }
+
   function saveSession(s) {
     authSession = s;
     try { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch {}
@@ -4658,12 +4703,12 @@
     const payload = {
       user_id: authSession.user.id,
       bests: bests,
-      history: history.slice(0, 200), // cap to avoid huge payloads
+      history: history.slice(0, 200),
       updated_at: new Date().toISOString(),
     };
-    const res = await fetch(STATS_URL, {
+    const res = await authFetch(STATS_URL, {
       method: 'POST',
-      headers: { ...authHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
@@ -4675,32 +4720,22 @@
   // Pull stats from Supabase and merge into local
   async function pullStats() {
     if (!authSession) return false;
-    const res = await fetch(`${STATS_URL}?user_id=eq.${authSession.user.id}&select=bests,history`, {
-      headers: authHeaders(),
-    });
+    const res = await authFetch(`${STATS_URL}?user_id=eq.${authSession.user.id}&select=bests,history`);
     if (!res.ok) throw new Error(`Pull failed (${res.status})`);
     const rows = await res.json();
-    if (!rows.length) return false; // no remote data yet
+    if (!rows.length) return false;
 
     const remote = rows[0];
-
-    // Merge bests — keep higher WPM per key
     let changed = false;
     Object.entries(remote.bests || {}).forEach(([key, rb]) => {
-      if (!bests[key] || rb.wpm > bests[key].wpm) {
-        bests[key] = rb;
-        changed = true;
-      }
+      if (!bests[key] || rb.wpm > bests[key].wpm) { bests[key] = rb; changed = true; }
     });
-
-    // Merge history — union by date, newest first, capped at 500
     const seen = new Set(history.map(h => h.date));
     (remote.history || []).forEach(h => {
       if (!seen.has(h.date)) { history.push(h); seen.add(h.date); changed = true; }
     });
     history.sort((a, b) => b.date - a.date);
     history = history.slice(0, 500);
-
     if (changed) {
       saveJSON(BESTS_KEY, bests);
       saveJSON(HISTORY_KEY, history);
@@ -4865,9 +4900,7 @@
 
   async function fetchProfile() {
     if (!authSession) return null;
-    const res = await fetch(`${PROFILES_URL}?user_id=eq.${authSession.user.id}&select=username`, {
-      headers: authHeaders(),
-    });
+    const res = await authFetch(`${PROFILES_URL}?user_id=eq.${authSession.user.id}&select=username`);
     if (!res.ok) return null;
     const rows = await res.json();
     return rows.length ? rows[0].username : null;
@@ -4875,9 +4908,9 @@
 
   async function saveProfile(username) {
     if (!authSession) throw new Error('Not signed in');
-    const res = await fetch(PROFILES_URL, {
+    const res = await authFetch(PROFILES_URL, {
       method: 'POST',
-      headers: { ...authHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ user_id: authSession.user.id, username }),
     });
     if (!res.ok) {
@@ -4887,11 +4920,11 @@
   }
 
   async function submitDailyScore(wpm, acc) {
-    if (!authSession) return; // not signed in — leaderboard is opt-in
+    if (!authSession) return;
     const date = getDailyDateStr();
-    const res = await fetch(DAILY_SCORES_URL, {
+    const res = await authFetch(DAILY_SCORES_URL, {
       method: 'POST',
-      headers: { ...authHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ user_id: authSession.user.id, date, wpm, acc }),
     });
     if (!res.ok) console.warn('Daily score submit failed:', res.status);
