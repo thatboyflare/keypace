@@ -903,6 +903,7 @@
     transform: translate3d(0,0,0);
     transition: opacity 0.18s ease;
   }
+  .caret.no-transition { transition: none !important; }
   .caret.blink { animation: caretblink 1.05s ease-in-out infinite; }
   @keyframes caretblink { 0%, 42% { opacity: 1; } 65%, 92% { opacity: 0.12; } 100% { opacity: 1; } }
 
@@ -2697,10 +2698,9 @@
     document.body.classList.remove('zen-mode');
     document.getElementById('zenStage').style.display = 'none';
     document.getElementById('stage').style.display = 'flex';
-    cachedLineHeight = null;
+    cachedLineHeight = null; cachedPositions = [];
 
     renderField();
-    lastCaretLine = null;
     timerEl.textContent = state.mode === 'time' ? state.val : '';
     timerEl.classList.remove('show');
     liveWpmEl.classList.remove('show');
@@ -2745,12 +2745,13 @@
 
   // ---------------- render ----------------
   let cachedSpans = [];
+  let cachedPositions = [];
 
   function renderField() {
     const frag = document.createDocumentFragment();
     cachedSpans = new Array(state.chars.length);
+    cachedPositions = [];
 
-    // Build syntax token map for code mode before creating spans
     const syntaxMap = settings.code ? buildSyntaxMap(state.text) : null;
 
     state.chars.forEach((c, i) => {
@@ -2763,14 +2764,55 @@
       frag.appendChild(span);
       cachedSpans[i] = span;
     });
+
     field.innerHTML = '';
     field.appendChild(frag);
+
     caretEl = document.createElement('div');
     caretEl.className = 'caret blink';
     field.appendChild(caretEl);
   }
 
-  // Lightweight JS tokenizer — returns an array where each index holds the
+  function charSpans() { return cachedSpans; }
+
+  function updateCaret(instant) {
+    if (!caretEl || !cachedSpans.length) return;
+
+    const idx = Math.min(state.typed.length, cachedSpans.length - 1);
+    const target = cachedSpans[idx];
+    const isEnd = state.typed.length >= cachedSpans.length;
+
+    const fieldRect = field.getBoundingClientRect();
+    const tRect = target.getBoundingClientRect();
+    const lineHeight = getLineHeight();
+
+    const x = (tRect.left - fieldRect.left) + field.scrollLeft + (isEnd ? tRect.width : 0);
+    const yAbsRaw = (tRect.top - fieldRect.top) + field.scrollTop;
+    const lineIdx = Math.round(yAbsRaw / lineHeight);
+
+    // Scroll to keep caret on middle row
+    const desiredScrollLines = Math.max(0, lineIdx - 1);
+    const desiredScrollTop = Math.round(desiredScrollLines * lineHeight);
+    if (field.scrollTop !== desiredScrollTop) {
+      field.scrollTop = desiredScrollTop;
+    }
+
+    // y derived from lineIdx so it's always consistent with the scroll we just set
+    const y = lineIdx * lineHeight - field.scrollTop;
+
+    caretEl.style.transition = instant ? 'none' : 'transform 0.1s cubic-bezier(0.2, 0, 0.2, 1)';
+    caretEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+
+    caretEl.classList.remove('blink');
+    if (instant) {
+      requestAnimationFrame(() => { if (caretEl) caretEl.classList.add('blink'); });
+    } else {
+      clearTimeout(updateCaret._t);
+      updateCaret._t = setTimeout(() => { if (caretEl) caretEl.classList.add('blink'); }, 500);
+    }
+  }
+
+
   // syntax type for that character position in the text string. Only runs
   // in code mode, once per field render.
   function buildSyntaxMap(text) {
@@ -2889,7 +2931,7 @@
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
-  let cachedLineHeight = null;
+  let cachedLineHeight = null; cachedPositions = [];
   function getLineHeight() {
     if (cachedLineHeight) return cachedLineHeight;
     const cs = window.getComputedStyle(field);
@@ -2901,109 +2943,6 @@
     cachedLineHeight = lh;
     return lh;
   }
-
-  let lastCaretLine = null;
-
-  // Returns a rect for the character at `idx` using the Range API, which
-  // asks the browser's own text-layout engine for the exact box a glyph
-  // occupies — rather than us re-deriving it from a span's box model. This
-  // sidesteps every edge case that span-based measurement ran into
-  // (boundary spaces at a wrap point, inline-block spacing quirks, etc.)
-  // because it's the same mechanism the browser uses for native text
-  // selection and native caret rendering.
-  function rectForChar(idx, atTrailingEdge) {
-    const spans = charSpans();
-    const span = spans[idx];
-    if (!span || !span.firstChild) return null;
-    const range = document.createRange();
-    const textNode = span.firstChild;
-    const len = textNode.length || 0;
-    if (atTrailingEdge) {
-      range.setStart(textNode, len);
-      range.setEnd(textNode, len);
-    } else {
-      range.setStart(textNode, 0);
-      range.setEnd(textNode, Math.min(1, len));
-    }
-    const rects = range.getClientRects();
-    if (rects.length) return rects[0];
-    // collapsed range (trailing edge) can return zero rects in some
-    // browsers — fall back to the span's own box, offset to its right edge
-    const r = span.getBoundingClientRect();
-    return atTrailingEdge ? { left: r.right, top: r.top, width: 0, height: r.height } : r;
-  }
-
-  function updateCaret(instant) {
-    const spans = charSpans();
-    if (!spans.length || !caretEl) return;
-    const lastIdx = spans.length - 1;
-    const isEnd = state.typed.length >= spans.length;
-    const idx = isEnd ? lastIdx : state.typed.length;
-    const lineHeight = getLineHeight();
-    const fieldRect = field.getBoundingClientRect();
-
-    const rect = rectForChar(idx, isEnd);
-    if (!rect) return;
-
-    // The caret is a normal (scrolling) absolutely-positioned child of
-    // `field`, the same element we set scrollTop on. That means the browser
-    // ALREADY shifts the caret's rendered position by -scrollTop natively,
-    // the same way it shifts every character span. So the transform we
-    // apply must be in unscrolled, absolute-document coordinates — we must
-    // NOT also subtract scrollTop ourselves, or the shift gets applied
-    // twice and desyncs for exactly one frame right when scrollTop changes
-    // (i.e. exactly when a new line scrolls into view).
-    const x = (rect.left - fieldRect.left) + field.scrollLeft;
-    const yAbsRaw = (rect.top - fieldRect.top) + field.scrollTop;
-    const lineIdx = Math.round(yAbsRaw / lineHeight);
-    const y = lineIdx * lineHeight; // absolute, NOT minus scrollTop
-
-    // Keep the caret on the middle row of the 3-line window once past the
-    // first line — this means there's always one line of upcoming text
-    // already visible below the caret, so reaching a new line never causes
-    // a sudden snap or blank moment. The view rolls one line at a time as
-    // you type, exactly like MonkeyType's behaviour.
-    // Lines 0-1: no scroll yet (caret sits naturally at top).
-    // Line 2+: scroll so caret stays on row 1 (middle), with one typed
-    // line above and one upcoming line below always in view.
-    const desiredScrollLines = Math.max(0, lineIdx - 1);
-    const desiredScrollTop = Math.round(desiredScrollLines * lineHeight);
-    if (field.scrollTop !== desiredScrollTop) {
-      field.scrollTop = desiredScrollTop;
-    }
-
-    // A CSS transform transition animates in a straight line. That's the
-    // smooth slide we want between two characters on the SAME row — but if
-    // we also animate it across a line change, the caret visibly slides
-    // diagonally across the whole field. So: animate within a line, snap
-    // instantly the moment the line changes.
-    const lineChanged = lastCaretLine !== null && lineIdx !== lastCaretLine;
-    const useInstant = instant || lineChanged;
-    lastCaretLine = lineIdx;
-
-    // The previous ease-out curve decelerated hard into every single
-    // character — fast start, hard stop. Each individual move looked fine,
-    // but typing is a constant stream of these moves, and a hard
-    // decelerate-to-zero-velocity at every letter is exactly what reads as
-    // discrete/robotic rather than fluid: the caret visibly "thuds" to a
-    // stop, then snaps to full speed again for the next jump. A linear
-    // (constant-velocity) glide has no landing deceleration to interrupt,
-    // so when the next keystroke arrives before the current move finishes
-    // — which is the normal case at real typing speed — the caret just
-    // smoothly redirects instead of visibly catching itself mid-stop. This
-    // is what actually produces a continuous-feeling glide instead of a
-    // sequence of separate hops.
-    caretEl.style.transition = useInstant ? 'none' : 'transform 0.045s linear';
-    caretEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-    caretEl.classList.remove('blink');
-    if (useInstant) {
-      requestAnimationFrame(() => { caretEl.classList.add('blink'); });
-    } else {
-      clearTimeout(updateCaret._t);
-      updateCaret._t = setTimeout(() => caretEl.classList.add('blink'), 500);
-    }
-  }
-
 
   // ---------------- typing logic ----------------
   function startTestIfNeeded() {
@@ -3999,7 +3938,7 @@
     // Different monospace fonts have different character widths, so the
     // cached line-height (and every span position the caret depends on)
     // is stale the instant the font changes — same situation as a resize.
-    cachedLineHeight = null;
+    cachedLineHeight = null; cachedPositions = [];
     updateCaret(true);
     // All font files are requested upfront in <head>, so this is normally
     // already a no-op — but if the chosen font was still downloading at
@@ -4009,7 +3948,7 @@
     // caret/line-height if that swap happens after the fact.
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => {
-        cachedLineHeight = null;
+        cachedLineHeight = null; cachedPositions = [];
         updateCaret(true);
       });
     }
@@ -4379,7 +4318,6 @@
     state.wpmHistory = []; state.errorsAtIndex = new Set();
     clearInterval(state.timerId);
     renderField();
-    lastCaretLine = null;
     timerEl.textContent = state.mode === 'time' ? state.val : '';
     timerEl.classList.remove('show');
     liveWpmEl.classList.remove('show');
@@ -4469,7 +4407,10 @@
     focusInput();
   });
 
-  window.addEventListener('resize', () => { cachedLineHeight = null; updateCaret(true); });
+  window.addEventListener('resize', () => {
+    cachedLineHeight = null; cachedPositions = [];
+    updateCaret(true);
+  });
 
   // ---------------- account / auth ----------------
   const AUTH_URL   = `${SUPABASE_URL}/auth/v1`;
