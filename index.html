@@ -808,6 +808,19 @@
     color: var(--ink-faint);
     transition: color 0.06s linear;
   }
+
+  /* ── Syntax highlighting for code mode ──────────────────────────────────────
+     Must come BEFORE .correct/.incorrect so typing state always wins
+     when both apply (later rules with equal specificity override earlier ones).  */
+  .field .char[data-syntax="keyword"]   { color: #6699cc; }
+  .field .char[data-syntax="string"]    { color: #cc9966; }
+  .field .char[data-syntax="number"]    { color: #99cc88; }
+  .field .char[data-syntax="call"]      { color: #ddcc88; }
+  .field .char[data-syntax="bracket"]   { color: #cc99cc; }
+  .field .char[data-syntax="operator"]  { color: #88cccc; }
+  .field .char[data-syntax="punct"]     { color: #888899; }
+
+  /* Typing state — comes after syntax rules so these always win */
   .field .char.correct { color: var(--ink); animation: charpop 0.1s ease-out; }
   .field .char.incorrect { color: var(--error); text-decoration: underline; text-decoration-color: var(--error-dim); text-decoration-thickness: 2px; animation: charpop 0.1s ease-out; }
   .field .char.extra { color: var(--error-dim); }
@@ -2406,7 +2419,24 @@
   let bests = loadJSON(BESTS_KEY, {});       // { "time:30": {wpm, acc, date}, ... }
   let history = loadJSON(HISTORY_KEY, []);   // [ {key, wpm, acc, date}, ... ] newest first, capped
 
-  function bestKeyFor(mode, val) { return mode + ':' + val; }
+  function bestKeyFor(mode, val, opts) {
+    const o = opts || settings;
+    const modifier = o.code ? 'code'
+                   : o.punctuation && o.numbers ? 'punct+nums'
+                   : o.punctuation ? 'punct'
+                   : o.numbers ? 'nums'
+                   : '';
+    return modifier ? `${mode}:${val}:${modifier}` : `${mode}:${val}`;
+  }
+
+  // Human-readable labels for modifier suffixes in keys like "time:30:punct"
+  const MODIFIER_LABELS = {
+    '':          'plain',
+    'punct':     '+ punct',
+    'nums':      '+ nums',
+    'punct+nums':'+ punct & nums',
+    'code':      'code',
+  };
 
   // ---------------- sound engine (Web Audio, synthesized — no asset files) ----------------
   let audioCtx = null;
@@ -2623,12 +2653,17 @@
   function renderField() {
     const frag = document.createDocumentFragment();
     cachedSpans = new Array(state.chars.length);
+
+    // Build syntax token map for code mode before creating spans
+    const syntaxMap = settings.code ? buildSyntaxMap(state.text) : null;
+
     state.chars.forEach((c, i) => {
       const span = document.createElement('span');
       span.className = 'char';
       if (c.status !== 'pending') span.classList.add(c.status);
       span.textContent = c.char;
       span.dataset.i = i;
+      if (syntaxMap && syntaxMap[i]) span.dataset.syntax = syntaxMap[i];
       frag.appendChild(span);
       cachedSpans[i] = span;
     });
@@ -2637,6 +2672,97 @@
     caretEl = document.createElement('div');
     caretEl.className = 'caret blink';
     field.appendChild(caretEl);
+  }
+
+  // Lightweight JS tokenizer — returns an array where each index holds the
+  // syntax type for that character position in the text string. Only runs
+  // in code mode, once per field render.
+  function buildSyntaxMap(text) {
+    const map = new Array(text.length).fill(null);
+    const KEYWORDS = new Set([
+      'const','let','var','function','return','if','else','while','for',
+      'class','new','this','typeof','instanceof','void','delete','in','of',
+      'async','await','try','catch','throw','import','export','default',
+      'switch','case','break','continue','null','undefined','true','false',
+      'from','extends','static','get','set','super','yield','do',
+    ]);
+
+    let i = 0;
+    while (i < text.length) {
+      const ch = text[i];
+
+      // Template literal (backtick string)
+      if (ch === '`') {
+        map[i++] = 'string';
+        while (i < text.length) {
+          if (text[i] === '\\') { map[i++] = 'string'; if (i < text.length) map[i++] = 'string'; continue; }
+          if (text[i] === '$' && text[i+1] === '{') {
+            // Interpolation — treat the ${...} as operators/identifiers
+            map[i++] = 'operator'; map[i++] = 'bracket';
+            let depth = 1;
+            while (i < text.length && depth > 0) {
+              if (text[i] === '{') depth++;
+              else if (text[i] === '}') depth--;
+              if (depth > 0) map[i++] = null; // let chars inside be re-classified
+              else map[i++] = 'bracket';
+            }
+            continue;
+          }
+          map[i] = 'string';
+          if (text[i++] === '`') break;
+        }
+        continue;
+      }
+
+      // Single/double quoted string
+      if (ch === '"' || ch === "'") {
+        const q = ch;
+        map[i++] = 'string';
+        while (i < text.length) {
+          if (text[i] === '\\') { map[i++] = 'string'; if (i < text.length) map[i++] = 'string'; continue; }
+          map[i] = 'string';
+          if (text[i++] === q) break;
+        }
+        continue;
+      }
+
+      // Line comment
+      if (ch === '/' && text[i+1] === '/') {
+        while (i < text.length && text[i] !== '\n') map[i++] = 'punct';
+        continue;
+      }
+
+      // Number — digit or .digit
+      if (/\d/.test(ch) || (ch === '.' && /\d/.test(text[i+1]||''))) {
+        while (i < text.length && /[\d.]/.test(text[i])) map[i++] = 'number';
+        continue;
+      }
+
+      // Identifier or keyword
+      if (/[a-zA-Z_$]/.test(ch)) {
+        const start = i;
+        while (i < text.length && /[\w$]/.test(text[i])) i++;
+        const word = text.slice(start, i);
+        // Peek ahead: if followed by ( it's a function call
+        let j = i; while (j < text.length && text[j] === ' ') j++;
+        const isCall = text[j] === '(';
+        const type = KEYWORDS.has(word) ? 'keyword' : isCall ? 'call' : null;
+        for (let k = start; k < i; k++) map[k] = type;
+        continue;
+      }
+
+      // Brackets
+      if ('(){}[]'.includes(ch)) { map[i++] = 'bracket'; continue; }
+
+      // Operators
+      if ('=>+-*/%&|!?<>^~'.includes(ch)) { map[i++] = 'operator'; continue; }
+
+      // Punctuation
+      if (';:.,'.includes(ch)) { map[i++] = 'punct'; continue; }
+
+      i++; // space, unknown — leave as null
+    }
+    return map;
   }
 
   // Previously re-ran field.querySelectorAll('.char') on every call — a
@@ -2924,16 +3050,13 @@
   }
 
   function extendTimeText() {
-    // Append new words to the live DOM instead of calling renderField()
-    // (which would destroy and recreate every span already on screen,
-    // including hundreds of already-typed/colored characters, just to add
-    // ~60 more words at the end). That full rebuild was happening
-    // periodically mid-test and was a real, visible stutter — this path
-    // only ever adds new nodes, never touches existing ones.
     const more = genWords(60, { punctuation: settings.punctuation, numbers: settings.numbers });
     state.words = state.words.concat(more);
     const newText = ' ' + more.join(' ');
     state.text += newText;
+
+    // Build syntax map for the new segment if in code mode
+    const segSyntaxMap = settings.code ? buildSyntaxMap(newText) : null;
 
     const startIdx = state.chars.length;
     const frag = document.createDocumentFragment();
@@ -2943,11 +3066,10 @@
       span.className = 'char';
       span.textContent = c;
       span.dataset.i = startIdx + j;
+      if (segSyntaxMap && segSyntaxMap[j]) span.dataset.syntax = segSyntaxMap[j];
       frag.appendChild(span);
       cachedSpans[startIdx + j] = span;
     });
-    // caretEl must stay the LAST child of field for rendering order, so
-    // insert the new spans just before it rather than appending after.
     field.insertBefore(frag, caretEl);
     updateCaret(true);
   }
@@ -2987,8 +3109,9 @@
 
     bestFlag.classList.toggle('show', isNewBest && wpm > 0);
     if (!isNewBest && prior) {
-      prevBest.textContent = '';
-      prevBest.innerHTML = 'personal best: <b>' + prior.wpm + '</b> wpm';
+      const parts = key.split(':');
+      const modSuffix = parts.length > 2 ? ` (${MODIFIER_LABELS[parts.slice(2).join(':')] || parts.slice(2).join(':')})` : '';
+      prevBest.innerHTML = `personal best${modSuffix}: <b>${prior.wpm}</b> wpm`;
     } else {
       prevBest.textContent = '';
     }
@@ -3082,6 +3205,74 @@
     { key: 'words:25', mode: 'words', val: 25, label: '25w' },
     { key: 'words:50', mode: 'words', val: 50, label: '50w' },
   ];
+
+  function renderPerfBests() {
+    const bestsGrid = document.getElementById('perfBests');
+    bestsGrid.innerHTML = '';
+
+    // Collect all keys that have a best, grouped by base mode
+    const allKeys = Object.keys(bests);
+
+    // Build display list: for each base mode, show plain + any modifier variants
+    const displayed = new Set();
+    const cards = [];
+
+    PERF_MODES.forEach(m => {
+      // Find all keys that start with this base key
+      const baseKey = m.key;
+      const variants = allKeys.filter(k => k === baseKey || k.startsWith(baseKey + ':'));
+      if (!variants.length) {
+        // Show placeholder for base mode even if no runs yet
+        cards.push({ key: baseKey, mode: m.mode, val: m.val, label: m.label, modifier: '', best: null });
+      } else {
+        variants.forEach(k => {
+          const parts = k.split(':');
+          const modifier = parts.length > 2 ? parts.slice(2).join(':') : '';
+          const modLabel = MODIFIER_LABELS[modifier] || modifier;
+          const displayLabel = modifier ? `${m.label} ${modLabel}` : m.label;
+          cards.push({ key: k, mode: m.mode, val: m.val, label: displayLabel, modifier, best: bests[k] });
+          displayed.add(k);
+        });
+        // Show placeholder if no plain variant exists yet
+        if (!displayed.has(baseKey) && !variants.includes(baseKey)) {
+          cards.push({ key: baseKey, mode: m.mode, val: m.val, label: m.label, modifier: '', best: null });
+        }
+      }
+    });
+
+    // Limit grid to avoid overflow on small screens — show at most 10
+    const toShow = cards.slice(0, 10);
+
+    toShow.forEach(c => {
+      const card = document.createElement('div');
+      card.className = 'perf-best-card' + (c.best ? '' : ' empty');
+      card.innerHTML = `
+        <div class="pbc-mode">${c.label}</div>
+        <div class="pbc-wpm">${c.best ? c.best.wpm : '—'}${c.best ? '<small>wpm</small>' : ''}</div>
+        <div class="pbc-meta">${c.best ? (c.best.acc + '% acc · ' + formatDate(c.best.date)) : 'no runs yet'}</div>
+        ${c.best ? `<button class="perf-replay-btn pbc-share-btn" data-key="${c.key}" style="margin-top:6px;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+          share pb
+        </button>` : ''}
+      `;
+      bestsGrid.appendChild(card);
+    });
+
+    // Wire share buttons on best cards
+    bestsGrid.addEventListener('click', (e) => {
+      const btn = e.target.closest('.pbc-share-btn');
+      if (!btn) return;
+      const key = btn.dataset.key;
+      const b = bests[key];
+      const parts = key.split(':');
+      if (b && parts.length >= 2) {
+        openShareFromHistory({
+          wpm: b.wpm, acc: b.acc, raw: b.wpm,
+          mode: parts[0], val: parseInt(parts[1], 10), date: b.date
+        });
+      }
+    });
+  }
 
   let perfFilterKey = 'all';
 
