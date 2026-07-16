@@ -760,6 +760,59 @@
   }
   .field.blurred { filter: blur(6px); opacity: 0.6; }
 
+  /* ── Zen mode ──────────────────────────────────────────────────────────── */
+  .zen-stage {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    animation: rise 0.3s ease;
+  }
+
+  .zen-field-wrap {
+    background: transparent;
+    border-bottom: 2px solid var(--border);
+    transition: border-color 0.2s ease;
+  }
+  .zen-field-wrap:focus-within { border-color: var(--accent); }
+
+  .zen-field {
+    font-family: var(--font-mono);
+    font-size: 28px;
+    line-height: 1.7;
+    color: var(--ink);
+    caret-color: var(--accent);
+    outline: none;
+    min-height: 120px;
+    max-height: 420px;
+    overflow-y: auto;
+    padding: 8px 0 16px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    letter-spacing: 0.3px;
+  }
+
+  .zen-field:empty::before {
+    content: attr(data-placeholder);
+    color: var(--ink-faint);
+    pointer-events: none;
+  }
+
+  .zen-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2px;
+  }
+
+  .zen-charcount {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+
+  body.zen-mode .toggles { opacity: 0.3; transition: opacity 0.3s ease; }
+  body.zen-mode .toggles:hover { opacity: 1; }
+
   .capslock-warning {
     display: none;
     align-items: center;
@@ -1991,6 +2044,8 @@
         <button data-mode="words" data-val="50">50w</button>
         <span class="sep"></span>
         <button data-mode="daily" data-val="0" id="dailyBtn">daily <span class="streak-badge" id="streakBadge"></span></button>
+        <span class="sep"></span>
+        <button data-mode="zen" data-val="0">zen</button>
       </nav>
       <button class="icon-btn" id="perfBtn" title="Performance history" aria-label="Performance history">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
@@ -2116,6 +2171,25 @@
         aria-hidden="true"
         tabindex="-1"
       />
+    </div>
+
+    <!-- Zen free-type stage — shown only in zen mode -->
+    <div class="zen-stage" id="zenStage" style="display:none">
+      <div class="zen-field-wrap">
+        <div
+          class="zen-field"
+          id="zenField"
+          contenteditable="true"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+          data-placeholder="just start typing…"
+        ></div>
+      </div>
+      <div class="zen-footer">
+        <span class="zen-charcount" id="zenCharCount">0 chars</span>
+        <button class="btn-text" id="zenClearBtn">clear</button>
+      </div>
     </div>
 
     <div class="restart-row" id="restartRow">
@@ -2581,6 +2655,20 @@
     if (state.mode === 'daily') {
       state.words = genDailyWords();
       state.val = state.words.length;
+    } else if (state.mode === 'zen') {
+      // Zen mode is a free-type field — show its own stage and bail out
+      document.body.classList.add('zen-mode');
+      document.getElementById('stage').style.display = 'none';
+      document.getElementById('zenStage').style.display = 'flex';
+      document.getElementById('restartRow').classList.add('hide');
+      result.classList.remove('show');
+      autoInsightEl.classList.remove('show');
+      document.getElementById('dailyComparison').classList.remove('show');
+      coachFab.classList.remove('visible');
+      document.body.classList.remove('is-typing');
+      const zf = document.getElementById('zenField');
+      zf.focus();
+      return; // skip the rest of buildTest entirely
     } else if (settings.code) {
       state.words = genCodeWords();
       if (state.mode === 'words') state.words = state.words.slice(0, state.val);
@@ -2606,6 +2694,10 @@
     ghostTimestamps = [];
     clearInterval(state.timerId);
     document.body.classList.remove('is-typing');
+    document.body.classList.remove('zen-mode');
+    document.getElementById('zenStage').style.display = 'none';
+    document.getElementById('stage').style.display = 'flex';
+    cachedLineHeight = null;
 
     renderField();
     lastCaretLine = null;
@@ -2616,11 +2708,15 @@
     autoInsightEl.classList.remove('show');
     document.getElementById('dailyComparison').classList.remove('show');
     autoInsightText.textContent = '';
-    coachFab.classList.add('visible');
+    coachFab.classList.toggle('visible', state.mode !== 'zen');
     if (coachOverlay) coachOverlay.classList.remove('show');
     stage.style.display = 'flex';
     restartRow.classList.remove('hide');
     field.classList.remove('blurred');
+
+    // Hide the topline entirely in zen mode — no distractions
+    document.getElementById('bestBadge').style.visibility = '';
+
     updateCaret(true);
     refreshBestBadge();
 
@@ -4368,7 +4464,8 @@
     // Don't steal focus when the user is interacting with controls (mode
     // pills, toggles, perf page, etc.) — only refocus when they tap the
     // typing area itself or elsewhere empty on the page.
-    if (e.target.closest('button, a, .perf-overlay, input, .theme-picker-wrap, .coach-overlay')) return;
+    if (e.target.closest('button, a, .perf-overlay, input, .theme-picker-wrap, .coach-overlay, .zen-stage')) return;
+    if (state.mode === 'zen') return;
     focusInput();
   });
 
@@ -4646,6 +4743,39 @@
     pullStats().then(() => pushStats()).catch(() => {});
   }
 
+  // ---------------- zen mode ----------------
+  const zenField = document.getElementById('zenField');
+  const zenCharCount = document.getElementById('zenCharCount');
+
+  zenField.addEventListener('input', () => {
+    const len = zenField.textContent.length;
+    zenCharCount.textContent = len === 0 ? '0 chars' : `${len.toLocaleString()} char${len === 1 ? '' : 's'}`;
+  });
+
+  zenField.addEventListener('keydown', (e) => {
+    // Tab in zen mode exits back to the last non-zen mode
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const lastMode = loadMode();
+      const fallback = lastMode && lastMode.mode !== 'zen' ? lastMode : { mode: 'time', val: 30 };
+      state.mode = fallback.mode;
+      state.val = fallback.val;
+      modesNav.querySelectorAll('button').forEach(b => {
+        const matches = b.dataset.mode === fallback.mode &&
+          (parseInt(b.dataset.val, 10) || 0) === (fallback.val || 0);
+        b.classList.toggle('active', matches);
+      });
+      buildTest();
+      focusInput();
+    }
+  });
+
+  document.getElementById('zenClearBtn').addEventListener('click', () => {
+    zenField.textContent = '';
+    zenCharCount.textContent = '0 chars';
+    zenField.focus();
+  });
+
   // ---------------- caps lock warning ----------------
   const capslockWarning = document.getElementById('capslockWarning');
 
@@ -4662,7 +4792,7 @@
 
   // global tab/escape capture even if focus elsewhere
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Tab') { e.preventDefault(); buildTest(); focusInput(); }
+    if (e.key === 'Tab' && state.mode !== 'zen') { e.preventDefault(); buildTest(); focusInput(); }
   });
 
   // ---------------- AI coach ----------------
