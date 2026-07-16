@@ -394,6 +394,14 @@
     font-weight: 700;
     flex-shrink: 0;
   }
+  .account-username {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    line-height: 1.2;
+  }
+
   .account-email {
     font-family: var(--font-ui);
     font-size: 12px;
@@ -1250,7 +1258,115 @@
     font-family: var(--font-ui);
   }
 
-  .history-strip {
+  .dc-stat-sub {
+    font-size: 11px;
+    color: var(--ink-faint);
+    font-family: var(--font-ui);
+  }
+
+  /* ---------- daily leaderboard ---------- */
+  .daily-leaderboard {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    flex-direction: column;
+    gap: 12px;
+    animation: rise 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .daily-leaderboard.show { display: flex; }
+
+  .dc-lb-date {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+
+  .lb-loading {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink-faint);
+    text-align: center;
+    padding: 16px 0;
+  }
+
+  .lb-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    transition: background 0.15s ease;
+  }
+  .lb-row:hover { background: var(--bg-soft); }
+  .lb-row.lb-me { background: var(--accent-wash); border: 1px solid var(--accent-dim); }
+
+  .lb-rank {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    width: 22px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .lb-rank.gold   { color: #f5c542; font-weight: 700; }
+  .lb-rank.silver { color: #b0b8c8; font-weight: 700; }
+  .lb-rank.bronze { color: #cd7f32; font-weight: 700; }
+
+  .lb-name {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--ink);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .lb-row.lb-me .lb-name { color: var(--accent); }
+
+  .lb-wpm {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+    flex-shrink: 0;
+  }
+  .lb-wpm small {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--ink-faint);
+    margin-left: 2px;
+  }
+
+  .lb-acc {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ink-faint);
+    flex-shrink: 0;
+    width: 44px;
+    text-align: right;
+  }
+
+  .lb-empty {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink-faint);
+    text-align: center;
+    padding: 16px 0;
+  }
+
+  .lb-signin-prompt {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink-dim);
+    text-align: center;
+    padding: 8px 0 4px;
+    line-height: 1.5;
+  }
+
+
     display: flex;
     align-items: center;
     gap: 7px;
@@ -2067,7 +2183,21 @@
             <div class="theme-panel-title">account</div>
             <div class="account-user-row">
               <div class="account-avatar" id="accountAvatar"></div>
-              <div class="account-email" id="accountEmail2"></div>
+              <div>
+                <div class="account-username" id="accountUsername">—</div>
+                <div class="account-email" id="accountEmail2"></div>
+              </div>
+            </div>
+            <!-- Username setup — shown when no username is set yet -->
+            <div id="usernameSetup" style="display:none;margin-top:8px;">
+              <p class="sync-copy" style="margin-bottom:6px;">Choose a display name for the leaderboard:</p>
+              <input type="text" id="usernameInput" class="sync-code-input" placeholder="e.g. speedtyper42" maxlength="20" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+              <button class="btn primary sync-action-btn" id="usernameSaveBtn">save username</button>
+              <div class="sync-result" id="usernameResult"></div>
+            </div>
+            <!-- Change username link when one is already set -->
+            <div id="usernameChange" style="display:none;margin-top:6px;">
+              <button class="btn-text" id="usernameChangeBtn" style="font-size:11px;color:var(--ink-faint);">change username</button>
             </div>
             <div class="sync-result show success" id="accountSyncStatus"></div>
             <div style="display:flex;gap:8px;margin-top:10px;">
@@ -2281,6 +2411,16 @@
           <svg id="dcChartSvg" viewBox="0 0 600 120" preserveAspectRatio="none"></svg>
         </div>
         <div class="dc-stats" id="dcStats"></div>
+      </div>
+
+      <div class="daily-leaderboard" id="dailyLeaderboard">
+        <div class="dc-header">
+          <span class="dc-title">today's leaderboard</span>
+          <span class="dc-lb-date" id="dcLbDate"></span>
+        </div>
+        <div class="lb-list" id="lbList">
+          <div class="lb-loading">loading scores…</div>
+        </div>
       </div>
 
       <div class="history-strip" id="historyStrip"></div>
@@ -2722,6 +2862,7 @@
     result.classList.remove('show');
     autoInsightEl.classList.remove('show');
     document.getElementById('dailyComparison').classList.remove('show');
+    document.getElementById('dailyLeaderboard').classList.remove('show');
     autoInsightText.textContent = '';
     coachFab.classList.toggle('visible', state.mode !== 'zen');
     if (coachOverlay) coachOverlay.classList.remove('show');
@@ -3220,11 +3361,25 @@
     // until the element is actually rendered, so we wait one frame.
     requestAnimationFrame(() => drawChart());
 
-    // ---- daily comparison ----
+    // ---- daily comparison + leaderboard ----
     if (state.mode === 'daily') {
       renderDailyComparison();
+      // Submit score to leaderboard (fire-and-forget, only if signed in)
+      if (authSession) {
+        submitDailyScore(wpm, accClamped).catch(() => {});
+      }
+      // Load leaderboard for today
+      const today = getDailyDateStr();
+      document.getElementById('dailyLeaderboard').classList.add('show');
+      document.getElementById('lbList').innerHTML = '<div class="lb-loading">loading scores…</div>';
+      fetchLeaderboard(today).then(rows => {
+        renderLeaderboard(rows, authSession?.user?.id, today);
+      }).catch(() => {
+        document.getElementById('lbList').innerHTML = '<div class="lb-empty">Could not load scores.</div>';
+      });
     } else {
       document.getElementById('dailyComparison').classList.remove('show');
+      document.getElementById('dailyLeaderboard').classList.remove('show');
     }
 
     // ---- auto insight ----
@@ -4701,6 +4856,184 @@
   if (authSession) {
     pullStats().then(() => pushStats()).catch(() => {});
   }
+
+  // ---------------- profiles & username ----------------
+  const PROFILES_URL     = `${SUPABASE_URL}/rest/v1/profiles`;
+  const DAILY_SCORES_URL = `${SUPABASE_URL}/rest/v1/daily_scores`;
+
+  let currentUsername = null; // cached after fetch
+
+  async function fetchProfile() {
+    if (!authSession) return null;
+    const res = await fetch(`${PROFILES_URL}?user_id=eq.${authSession.user.id}&select=username`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return rows.length ? rows[0].username : null;
+  }
+
+  async function saveProfile(username) {
+    if (!authSession) throw new Error('Not signed in');
+    const res = await fetch(PROFILES_URL, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ user_id: authSession.user.id, username }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `Error ${res.status}`);
+    }
+  }
+
+  async function submitDailyScore(wpm, acc) {
+    if (!authSession) return; // not signed in — leaderboard is opt-in
+    const date = getDailyDateStr();
+    const res = await fetch(DAILY_SCORES_URL, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ user_id: authSession.user.id, date, wpm, acc }),
+    });
+    if (!res.ok) console.warn('Daily score submit failed:', res.status);
+  }
+
+  async function fetchLeaderboard(date) {
+    // Join daily_scores with profiles to get username
+    const url = `${DAILY_SCORES_URL}?date=eq.${date}&select=wpm,acc,user_id,profiles(username)&order=wpm.desc&limit=20`;
+    const res = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  }
+
+  function renderLeaderboard(rows, myUserId, date) {
+    const panel = document.getElementById('dailyLeaderboard');
+    const list  = document.getElementById('lbList');
+    const dateEl = document.getElementById('dcLbDate');
+
+    panel.classList.add('show');
+    dateEl.textContent = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    if (!rows || !rows.length) {
+      list.innerHTML = '<div class="lb-empty">No scores yet today — be the first!</div>';
+      if (!authSession) {
+        list.innerHTML += '<div class="lb-signin-prompt">Sign in to submit your score and appear on the leaderboard.</div>';
+      }
+      return;
+    }
+
+    list.innerHTML = rows.map((row, i) => {
+      const username = row.profiles?.username || 'anonymous';
+      const isMe = myUserId && row.user_id === myUserId;
+      const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+      const rankSymbol = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`;
+      return `
+        <div class="lb-row ${isMe ? 'lb-me' : ''}">
+          <span class="lb-rank ${rankClass}">${rankSymbol}</span>
+          <span class="lb-name">${username}${isMe ? ' (you)' : ''}</span>
+          <span class="lb-wpm">${row.wpm}<small>wpm</small></span>
+          <span class="lb-acc">${row.acc}%</span>
+        </div>
+      `;
+    }).join('');
+
+    // If signed in but not on leaderboard yet, show a prompt
+    if (authSession && !rows.find(r => r.user_id === myUserId)) {
+      list.innerHTML += '<div class="lb-signin-prompt">Finish the daily challenge to appear on the leaderboard.</div>';
+    } else if (!authSession) {
+      list.innerHTML += '<div class="lb-signin-prompt">Sign in to submit your score.</div>';
+    }
+  }
+
+  // Update updateAccountUI to fetch and display username
+  const _origUpdateAccountUI = updateAccountUI;
+  async function updateAccountUI() {
+    const signedOut = document.getElementById('accountSignedOut');
+    const signedIn  = document.getElementById('accountSignedIn');
+    const btn = document.getElementById('accountBtn');
+
+    if (authSession) {
+      signedOut.style.display = 'none';
+      signedIn.style.display = '';
+      const email = authSession.user.email || '';
+      document.getElementById('accountEmail2').textContent = email;
+      document.getElementById('accountAvatar').textContent = email.charAt(0).toUpperCase();
+      document.getElementById('accountSyncStatus').textContent = 'Signed in — stats sync automatically.';
+      btn.classList.add('account-active');
+
+      // Load username
+      try {
+        currentUsername = await fetchProfile();
+      } catch { currentUsername = null; }
+
+      const usernameEl = document.getElementById('accountUsername');
+      const setupEl    = document.getElementById('usernameSetup');
+      const changeEl   = document.getElementById('usernameChange');
+
+      if (currentUsername) {
+        usernameEl.textContent = currentUsername;
+        setupEl.style.display = 'none';
+        changeEl.style.display = '';
+      } else {
+        usernameEl.textContent = 'no username set';
+        setupEl.style.display = '';
+        changeEl.style.display = 'none';
+      }
+    } else {
+      signedOut.style.display = '';
+      signedIn.style.display = 'none';
+      btn.classList.remove('account-active');
+      currentUsername = null;
+    }
+  }
+
+  // Wire username save
+  document.getElementById('usernameSaveBtn').addEventListener('click', async () => {
+    const input  = document.getElementById('usernameInput');
+    const result = document.getElementById('usernameResult');
+    const username = input.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+
+    if (username.length < 3) {
+      result.textContent = 'Username must be at least 3 characters (letters, numbers, _ or -).';
+      result.className = 'sync-result show error';
+      return;
+    }
+    document.getElementById('usernameSaveBtn').disabled = true;
+    result.textContent = 'Saving…';
+    result.className = 'sync-result show loading';
+
+    try {
+      await saveProfile(username);
+      currentUsername = username;
+      document.getElementById('accountUsername').textContent = username;
+      document.getElementById('usernameSetup').style.display = 'none';
+      document.getElementById('usernameChange').style.display = '';
+      result.textContent = '';
+      result.className = 'sync-result';
+    } catch (e) {
+      const msg = e.message?.includes('duplicate') || e.message?.includes('unique')
+        ? 'That username is already taken — try another.'
+        : e.message || 'Could not save username.';
+      result.textContent = msg;
+      result.className = 'sync-result show error';
+      document.getElementById('usernameSaveBtn').disabled = false;
+    }
+  });
+
+  document.getElementById('usernameChangeBtn').addEventListener('click', () => {
+    document.getElementById('usernameSetup').style.display = '';
+    document.getElementById('usernameChange').style.display = 'none';
+    document.getElementById('usernameInput').value = currentUsername || '';
+    document.getElementById('usernameInput').focus();
+  });
+
+  document.getElementById('usernameInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('usernameSaveBtn').click();
+  });
 
   // ---------------- zen mode ----------------
   const zenField = document.getElementById('zenField');
