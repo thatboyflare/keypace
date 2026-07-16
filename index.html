@@ -2797,8 +2797,11 @@
       field.scrollTop = desiredScrollTop;
     }
 
-    // y derived from lineIdx so it's always consistent with the scroll we just set
-    const y = lineIdx * lineHeight - field.scrollTop;
+    // y = the caret's unscrolled absolute position within the field.
+    // The caret is position:absolute inside the scrolling field, so the
+    // browser automatically shifts it by -scrollTop when rendering —
+    // do NOT subtract scrollTop here or it gets applied twice.
+    const y = lineIdx * lineHeight;
 
     caretEl.style.transition = instant ? 'none' : 'transform 0.1s cubic-bezier(0.2, 0, 0.2, 1)';
     caretEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
