@@ -6466,7 +6466,6 @@ Rules:
     const snap = predrillSnapshot;
     const wpmDiff = drillWpm - snap.wpm;
     const accDiff = drillAcc - snap.accuracy;
-
     const improved = drillWpm > snap.wpm || drillAcc > snap.accuracy;
 
     let comparison = '';
@@ -6481,28 +6480,56 @@ Rules:
     }
     if (!comparison) comparison = '<span class="drill-neutral">Similar performance — try the drill again.</span>';
 
-    // Populate result panel with drill context
-    document.getElementById('resWpm').textContent = drillWpm;
-    document.getElementById('resAcc').innerHTML   = drillAcc + '<small>%</small>';
-    document.getElementById('resRaw').textContent = Math.max(0, Math.round((state.keystrokes / 5) / ((state.endTime - state.startTime) / 60000)));
+    // Populate result stats
+    document.getElementById('resWpm').textContent   = drillWpm;
+    document.getElementById('resAcc').innerHTML     = drillAcc + '<small>%</small>';
+    const elapsedMs = state.endTime - state.startTime;
+    const elapsedMin = Math.max(0.001, elapsedMs / 60000);
+    document.getElementById('resRaw').textContent   = Math.max(0, Math.round((state.keystrokes / 5) / elapsedMin));
     document.getElementById('resChars').textContent = state.typed.length;
-    document.getElementById('resTime').textContent = Math.round((state.endTime - state.startTime) / 1000) + 's';
+    document.getElementById('resTime').textContent  = Math.round(elapsedMs / 1000) + 's';
 
+    // Build a synthetic wpmHistory so the chart has data to render.
+    // Divide the test into ~10 equal buckets using ghostTimestamps.
+    const elapsedSec = Math.max(1, elapsedMs / 1000);
+    if (ghostTimestamps.length > 5) {
+      const buckets = Math.min(10, Math.floor(ghostTimestamps.length / 3));
+      const bucketSize = Math.floor(ghostTimestamps.length / buckets);
+      state.wpmHistory = [];
+      for (let b = 0; b < buckets; b++) {
+        const endIdx  = Math.min((b + 1) * bucketSize, ghostTimestamps.length) - 1;
+        const endMs   = ghostTimestamps[endIdx];
+        const correctInBucket = state.chars
+          .slice(0, endIdx + 1)
+          .filter(c => c.status === 'correct').length;
+        const bWpm = Math.round((correctInBucket / 5) / (endMs / 60000));
+        const bRaw = Math.round(((endIdx + 1) / 5) / (endMs / 60000));
+        state.wpmHistory.push({ t: b + 1, wpm: Math.max(0, bWpm), raw: Math.max(0, bRaw) });
+      }
+    } else {
+      // Fallback: single point
+      state.wpmHistory = [{ t: 1, wpm: drillWpm, raw: Math.max(drillWpm, Math.round(state.keystrokes / 5 / elapsedMin)) }];
+    }
+
+    // Show result panel
     stage.style.display = 'none';
     restartRow.classList.add('hide');
     result.classList.add('show');
     coachFab.classList.add('visible');
 
-    // Hide daily panels
     document.getElementById('dailyComparison').classList.remove('show');
     document.getElementById('dailyLeaderboard').classList.remove('show');
 
+    // Hide normal best/prev-best — not relevant for drills
+    bestFlag.classList.remove('show');
+    prevBest.textContent = '';
+
+    // Draw chart after panel is visible
     requestAnimationFrame(() => drawChart());
 
-    // Replace best/prev-best with drill comparison banner
+    // Inject drill comparison banner — insert it AFTER result-grid (not inside it)
     const existing = document.getElementById('drillComparison');
     if (existing) existing.remove();
-
     const banner = document.createElement('div');
     banner.id = 'drillComparison';
     banner.className = 'drill-comparison';
@@ -6511,13 +6538,14 @@ Rules:
       <div class="drill-comparison-diff">${comparison}</div>
       <div class="drill-comparison-sub">${improved
         ? `The "${snap.drill.title}" drill is working.`
-        : `Keep going — improvement takes a few reps.`}
-      </div>
+        : 'Keep going — improvement takes a few reps.'}</div>
     `;
-    bestFlag.after(banner);
+    // Insert after .result-grid, before .result-actions
+    const resultGrid    = result.querySelector('.result-grid');
+    const resultActions = result.querySelector('.result-actions');
+    result.insertBefore(banner, resultActions);
 
-    // Show auto-insight for the drill too
-    const elapsedSec = Math.max(1, (state.endTime - state.startTime) / 1000);
+    // Auto-insight (deterministic fallback — no AI call for drill results)
     const diag = runDiagnostics(state, ghostTimestamps, elapsedSec);
     lastDiagnostics = diag;
     lastDrill = generateDrill(diag);
@@ -6527,6 +6555,10 @@ Rules:
 
     // Offer another drill rep
     renderDrillCTA(lastDrill);
+
+    // Update history strip with current history (drill doesn't add to history)
+    renderHistory();
+
     predrillSnapshot = null;
   }
 
