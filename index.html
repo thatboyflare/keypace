@@ -1181,7 +1181,78 @@
     animation: caretblink 1s steps(1) infinite;
   }
 
-  /* ---------- daily comparison ---------- */
+  /* ---------- drill CTA ---------- */
+  .drill-cta {
+    background: var(--panel);
+    border: 1px solid var(--accent-dim);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    animation: rise 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .drill-cta-inner { display: flex; flex-direction: column; gap: 6px; }
+  .drill-cta-label {
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+  }
+  .drill-cta-title {
+    font-family: var(--font-ui);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .drill-cta-rationale {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink-dim);
+    line-height: 1.5;
+  }
+  .drill-cta-goal {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-top: 2px;
+  }
+  .drill-cta-btn { align-self: flex-start; margin-top: 8px; }
+
+  /* ---------- drill comparison ---------- */
+  .drill-comparison {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    animation: rise 0.3s ease;
+    margin-bottom: 2px;
+  }
+  .drill-comparison-label {
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-faint);
+  }
+  .drill-comparison-diff {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .drill-improve { color: var(--good); }
+  .drill-decline { color: var(--error); }
+  .drill-neutral { color: var(--ink-dim); font-size: 13px; font-weight: 400; }
+  .drill-comparison-sub {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+
+
   .daily-comparison {
     display: none;
     background: var(--panel);
@@ -2808,7 +2879,10 @@
   function buildTest() {
     const genOpts = { punctuation: settings.punctuation, numbers: settings.numbers };
 
-    if (state.mode === 'daily') {
+    if (state.mode === '_drill') {
+      // words already set by startDrill() — just use them as a words-mode test
+      // state.words and state.val are already set
+    } else if (state.mode === 'daily') {
       state.words = genDailyWords();
       state.val = state.words.length;
     } else if (state.mode === 'zen') {
@@ -2866,6 +2940,11 @@
     autoInsightText.textContent = '';
     coachFab.classList.toggle('visible', state.mode !== 'zen');
     if (coachOverlay) coachOverlay.classList.remove('show');
+    // Clean up drill elements
+    const oldDrillCta = document.getElementById('drillCta');
+    if (oldDrillCta) oldDrillCta.remove();
+    const oldDrillComp = document.getElementById('drillComparison');
+    if (oldDrillComp) oldDrillComp.remove();
     stage.style.display = 'flex';
     restartRow.classList.remove('hide');
     field.classList.remove('blurred');
@@ -3209,7 +3288,7 @@
         updateCaret(false);
         playKeySound('key');
 
-        if ((state.mode === 'words' || state.mode === 'daily') && state.typed.length >= state.text.length) {
+        if ((state.mode === 'words' || state.mode === 'daily' || state.mode === '_drill') && state.typed.length >= state.text.length) {
           finishTest();
           return;
         }
@@ -3234,7 +3313,7 @@
     updateCaret(false);
     playKeySound(isCorrect ? 'key' : 'error');
 
-    if ((state.mode === 'words' || state.mode === 'daily') && state.typed.length >= state.text.length) {
+    if ((state.mode === 'words' || state.mode === 'daily' || state.mode === '_drill') && state.typed.length >= state.text.length) {
       finishTest();
       return;
     }
@@ -3280,6 +3359,16 @@
 
   // ---------------- results ----------------
   function showResults() {
+    // Drill mode: show before/after comparison instead of normal results
+    if (state.mode === '_drill' && predrillSnapshot) {
+      const elapsedSec = Math.max(1, (state.endTime - state.startTime) / 1000);
+      const drillWpm = Math.max(0, Math.round((state.correctKeystrokes / 5) / (elapsedSec / 60)));
+      const drillAcc = state.keystrokes === 0 ? 100 :
+        Math.max(0, Math.min(100, Math.round((state.correctKeystrokes / state.keystrokes) * 100)));
+      showDrillResults(drillWpm, drillAcc);
+      return;
+    }
+
     const elapsedSec = Math.max(1, (state.endTime - state.startTime) / 1000);
     const elapsedMin = elapsedSec / 60;
     const wpm = Math.max(0, Math.round((state.correctKeystrokes / 5) / elapsedMin));
@@ -5866,30 +5955,399 @@ COACHING GUIDELINES:
   const autoInsightEl = document.getElementById('autoInsight');
   const autoInsightText = document.getElementById('autoInsightText');
 
+  // ================================================================
+  // DIAGNOSTIC ENGINE
+  // Runs purely on captured keystroke data — no inference or guessing.
+  // Returns a DiagnosticResult that the coach and drill generator use.
+  // ================================================================
+
+  function runDiagnostics(state, ghostTimestamps, elapsedSec) {
+    const text    = state.text;
+    const typed   = state.typed;
+    const chars   = state.chars;
+    const words   = state.words;
+    const errors  = state.errorsAtIndex; // Set of character indices
+    const ts      = ghostTimestamps;     // ms elapsed at each keypress
+
+    const totalChars    = typed.length;
+    const elapsedMin    = elapsedSec / 60;
+    const correctKs     = state.correctKeystrokes;
+    const totalKs       = state.keystrokes;
+    const wpm           = Math.max(0, Math.round((correctKs / 5) / elapsedMin));
+    const raw           = Math.max(0, Math.round((totalKs / 5) / elapsedMin));
+    const accuracy      = totalKs === 0 ? 100 : Math.round((correctKs / totalKs) * 100);
+
+    // --- Inter-key intervals from timestamps ---
+    const intervals = [];
+    for (let i = 1; i < ts.length; i++) {
+      intervals.push(ts[i] - ts[i - 1]);
+    }
+    const avgInterval = intervals.length
+      ? intervals.reduce((a, b) => a + b, 0) / intervals.length
+      : 0;
+
+    // --- Speed over time (first half vs second half) ---
+    const wpmHistory = state.wpmHistory || [];
+    const halfIdx = Math.floor(wpmHistory.length / 2);
+    const firstHalfWpm = halfIdx > 0
+      ? Math.round(wpmHistory.slice(0, halfIdx).reduce((a, h) => a + h.wpm, 0) / halfIdx)
+      : wpm;
+    const secondHalfWpm = halfIdx > 0
+      ? Math.round(wpmHistory.slice(halfIdx).reduce((a, h) => a + h.wpm, 0) / (wpmHistory.length - halfIdx))
+      : wpm;
+    const speedDecay = firstHalfWpm > 0 ? Math.round(((firstHalfWpm - secondHalfWpm) / firstHalfWpm) * 100) : 0;
+
+    // --- Error rate per character (only chars we have typing data for) ---
+    const charErrorCounts  = {};
+    const charTypedCounts  = {};
+    for (let i = 0; i < totalChars; i++) {
+      const expected = text[i];
+      if (!expected) continue;
+      charTypedCounts[expected] = (charTypedCounts[expected] || 0) + 1;
+      if (errors.has(i)) {
+        charErrorCounts[expected] = (charErrorCounts[expected] || 0) + 1;
+      }
+    }
+
+    // Build sorted list of worst characters (min 3 appearances, >20% error rate)
+    const weakChars = Object.entries(charErrorCounts)
+      .map(([ch, errCount]) => ({
+        char: ch,
+        errors: errCount,
+        total: charTypedCounts[ch] || 1,
+        rate: errCount / (charTypedCounts[ch] || 1),
+      }))
+      .filter(c => c.total >= 3 && c.rate > 0.2)
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 5);
+
+    // --- Slowest bigrams (pairs of consecutive characters) ---
+    // Map each bigram to its average inter-key delay
+    const bigramDelays = {};
+    const bigramCounts = {};
+    for (let i = 0; i + 1 < totalChars && i + 1 < ts.length; i++) {
+      if (errors.has(i) || errors.has(i + 1)) continue; // only clean presses
+      const bigram = text[i] + text[i + 1];
+      const delay  = ts[i + 1] - ts[i];
+      if (delay < 0 || delay > 3000) continue; // skip pauses > 3s (distraction)
+      bigramDelays[bigram] = (bigramDelays[bigram] || 0) + delay;
+      bigramCounts[bigram] = (bigramCounts[bigram] || 0) + 1;
+    }
+    const slowBigrams = Object.entries(bigramDelays)
+      .map(([bg, total]) => ({
+        bigram: bg,
+        avgDelay: Math.round(total / bigramCounts[bg]),
+        count: bigramCounts[bg],
+      }))
+      .filter(b => b.count >= 2 && b.avgDelay > avgInterval * 1.6)
+      .sort((a, b) => b.avgDelay - a.avgDelay)
+      .slice(0, 5);
+
+    // --- Hesitation points (long pauses before specific chars) ---
+    const hesitations = [];
+    for (let i = 1; i < ts.length; i++) {
+      const delay = ts[i] - ts[i - 1];
+      if (delay > avgInterval * 2.5 && delay < 5000) {
+        hesitations.push({ charIndex: i, char: text[i] || '', delay });
+      }
+    }
+    const hesitatedChars = {};
+    hesitations.forEach(h => {
+      if (!h.char.trim()) return;
+      hesitatedChars[h.char] = (hesitatedChars[h.char] || 0) + 1;
+    });
+
+    // --- Punctuation & capitalization performance ---
+    const PUNCT = new Set('.,!?;:\'"()[]{}');
+    let punctTyped = 0, punctErrors = 0;
+    let capitalTyped = 0, capitalErrors = 0;
+    for (let i = 0; i < totalChars; i++) {
+      const ch = text[i];
+      if (!ch) continue;
+      if (PUNCT.has(ch)) {
+        punctTyped++;
+        if (errors.has(i)) punctErrors++;
+      }
+      if (ch >= 'A' && ch <= 'Z') {
+        capitalTyped++;
+        if (errors.has(i)) capitalErrors++;
+      }
+    }
+    const punctAccuracy = punctTyped > 0
+      ? Math.round((1 - punctErrors / punctTyped) * 100) : null;
+    const capitalAccuracy = capitalTyped > 0
+      ? Math.round((1 - capitalErrors / capitalTyped) * 100) : null;
+
+    // --- Error-prone words ---
+    let charPos = 0;
+    const wordErrors = words.map(word => {
+      let errCount = 0;
+      for (let j = 0; j < word.length; j++) {
+        if (charPos + j < totalChars && errors.has(charPos + j)) errCount++;
+      }
+      charPos += word.length + 1; // +1 for space
+      return { word, errors: errCount, length: word.length };
+    }).filter(w => w.errors > 0)
+      .sort((a, b) => (b.errors / b.length) - (a.errors / a.length))
+      .slice(0, 8);
+
+    // --- Primary limiter (what's holding the user back the most) ---
+    let limiter = 'speed';
+    if (accuracy < 92) limiter = 'accuracy';
+    else if (speedDecay > 15) limiter = 'endurance';
+    else if (slowBigrams.length >= 3) limiter = 'consistency';
+    else if (weakChars.length >= 2) limiter = 'specific_chars';
+    else if (punctAccuracy !== null && punctAccuracy < 85 && punctTyped >= 5) limiter = 'punctuation';
+
+    return {
+      wpm, raw, accuracy,
+      totalChars, elapsedSec,
+      avgInterval: Math.round(avgInterval),
+      firstHalfWpm, secondHalfWpm, speedDecay,
+      weakChars,
+      slowBigrams,
+      hesitatedChars,
+      wordErrors,
+      punctTyped, punctAccuracy,
+      capitalTyped, capitalAccuracy,
+      limiter,
+      hasTimingData: ts.length > 10,
+      hasEnoughData: totalChars > 20,
+    };
+  }
+
+  // ================================================================
+  // DRILL GENERATOR
+  // Takes DiagnosticResult → produces a targeted word list + metadata.
+  // All logic is deterministic — Claude may be asked to flesh out
+  // natural sentences around this content, but the target chars/
+  // patterns always come from here.
+  // ================================================================
+
+  function generateDrill(diag) {
+    const { limiter, weakChars, slowBigrams, wordErrors, punctAccuracy,
+            capitalAccuracy, speedDecay, accuracy } = diag;
+
+    let drillType, title, rationale, targetMetric, goal, words;
+
+    if (limiter === 'accuracy' || limiter === 'specific_chars') {
+      const topWeakChars = weakChars.slice(0, 3).map(c => c.char);
+      drillType = 'char_accuracy';
+      title = topWeakChars.length
+        ? `Fix "${topWeakChars.join('", "')}" errors`
+        : 'Accuracy drill';
+      rationale = topWeakChars.length
+        ? `You missed "${topWeakChars.join('", "')}" most often. This drill packs them into every word.`
+        : `Your accuracy was ${accuracy}%. Slow down slightly and focus on clean keystrokes.`;
+      targetMetric = 'accuracy';
+      goal = `Reach ${Math.min(accuracy + 5, 98)}% accuracy`;
+      words = buildCharFocusDrill(topWeakChars.length ? topWeakChars : null);
+
+    } else if (limiter === 'punctuation') {
+      drillType = 'punctuation';
+      title = 'Punctuation rhythm';
+      rationale = `Your punctuation accuracy was ${punctAccuracy}% — punctuation pauses were disrupting your flow.`;
+      targetMetric = 'punctuation_accuracy';
+      goal = 'Hit 90%+ punctuation accuracy';
+      words = buildPunctuationDrill();
+
+    } else if (limiter === 'endurance') {
+      drillType = 'endurance';
+      title = 'Endurance pace';
+      rationale = `Your speed dropped ${diag.speedDecay}% in the second half of the test. This drill helps you maintain pace.`;
+      targetMetric = 'speed_consistency';
+      goal = `Keep second-half WPM within 10% of first half`;
+      words = buildEnduranceDrill();
+
+    } else if (limiter === 'consistency' && slowBigrams.length) {
+      const topBigrams = slowBigrams.slice(0, 3).map(b => b.bigram);
+      drillType = 'bigram';
+      title = `"${topBigrams[0]}" rhythm drill`;
+      rationale = `You hesitated most on "${topBigrams.join('", "')}" — these transitions averaged ${slowBigrams[0].avgDelay}ms, well above your baseline.`;
+      targetMetric = 'consistency';
+      goal = `Smooth out the "${topBigrams[0]}" transition`;
+      words = buildBigramDrill(topBigrams);
+
+    } else {
+      // Default: speed drill with commonly slow words from this test
+      const slowWords = wordErrors.slice(0, 5).map(w => w.word);
+      drillType = 'speed';
+      title = 'Speed and flow drill';
+      rationale = slowWords.length
+        ? `You stumbled on "${slowWords.join('", "')}" — this drill repeats them in different contexts.`
+        : `Push your clean WPM higher with this focused drill.`;
+      targetMetric = 'wpm';
+      goal = `Beat ${diag.wpm + 3} WPM with 95%+ accuracy`;
+      words = slowWords.length ? buildWordFocusDrill(slowWords) : buildSpeedDrill();
+    }
+
+    return {
+      drillType,
+      title,
+      rationale,
+      targetMetric,
+      goal,
+      words,
+      durationSec: 30, // same as current default test
+      basedOn: { limiter, weakChars: weakChars.slice(0, 3), slowBigrams: slowBigrams.slice(0, 3) },
+    };
+  }
+
+  // ---- Drill word builders ----
+
+  const COMMON_WORDS = ['the','and','that','have','for','not','with','you','this','but','from','they','say','her','she','will','one','all','would','there','their','what','out','about','who','get','which','when','make','can','like','time','just','know','take','into','year','your','good','some','could','them','see','other','than','then','now','look','only','come','its','over','think','also','back','after','use','two','how','our','work','first','well','way','even','new','want','because','any','these','give','day','most','us'];
+
+  function buildCharFocusDrill(targetChars) {
+    if (!targetChars || !targetChars.length) return buildSpeedDrill();
+    // Find common words that contain the target characters
+    const focused = COMMON_WORDS.filter(w =>
+      targetChars.some(ch => w.includes(ch))
+    );
+    const filler  = COMMON_WORDS.filter(w =>
+      !targetChars.some(ch => w.includes(ch))
+    ).slice(0, 20);
+    const pool = [];
+    // 2:1 ratio of focused to filler
+    for (let i = 0; i < 60; i++) {
+      if (i % 3 === 2) pool.push(filler[i % filler.length]);
+      else pool.push(focused[i % focused.length]);
+    }
+    return pool;
+  }
+
+  function buildBigramDrill(bigrams) {
+    // Find words containing the bigram sequences
+    const focused = COMMON_WORDS.filter(w =>
+      bigrams.some(bg => w.includes(bg))
+    );
+    if (focused.length < 5) return buildSpeedDrill();
+    const pool = [];
+    for (let i = 0; i < 60; i++) pool.push(focused[i % focused.length]);
+    return pool;
+  }
+
+  function buildPunctuationDrill() {
+    // Sentences with varied punctuation
+    const sentences = [
+      'wait','stop','yes','no','well','now','here','there','come','go',
+      'look','see','find','take','make','have','get','put','say','tell',
+    ];
+    return sentences.slice(0, 40);
+  }
+
+  function buildEnduranceDrill() {
+    // Medium-length common words for sustained typing
+    return COMMON_WORDS.filter(w => w.length >= 3 && w.length <= 6).slice(0, 60);
+  }
+
+  function buildWordFocusDrill(targetWords) {
+    const pool = [];
+    const filler = COMMON_WORDS.filter(w => !targetWords.includes(w)).slice(0, 20);
+    for (let i = 0; i < 60; i++) {
+      if (i % 3 === 0) pool.push(targetWords[i % targetWords.length]);
+      else pool.push(filler[i % filler.length]);
+    }
+    return pool;
+  }
+
+  function buildSpeedDrill() {
+    return COMMON_WORDS.slice(0, 60);
+  }
+
+  // ================================================================
+  // STRUCTURED COACH REQUEST
+  // Sends deterministic diagnostics to Claude, gets back a validated
+  // JSON response. Falls back to a deterministic response if anything
+  // goes wrong — timeout, network error, bad JSON, rate limit.
+  // ================================================================
+
+  // Stored so the drill mode can access it
+  let lastDiagnostics = null;
+  let lastDrill = null;
+
   async function generateAutoInsight(wpm, acc, raw) {
     autoInsightEl.classList.add('show');
     autoInsightText.className = 'ai-insight-text streaming';
     autoInsightText.textContent = '';
 
-    const recentAvgWpm = history.length > 1
+    // Run the diagnostic engine first — this is always deterministic
+    const elapsedSec = lastResultData
+      ? Math.max(1, (state.endTime - state.startTime) / 1000)
+      : 30;
+    const diag = runDiagnostics(state, ghostTimestamps, elapsedSec);
+    lastDiagnostics = diag;
+
+    // Generate the drill recommendation deterministically
+    const drill = generateDrill(diag);
+    lastDrill = drill;
+
+    // Show the drill CTA button immediately (doesn't wait for AI)
+    renderDrillCTA(drill);
+
+    // Build recent history context (no PII — just WPM/acc numbers)
+    const recentAvg = history.length > 1
       ? Math.round(history.slice(1, 6).reduce((a, h) => a + h.wpm, 0) / Math.min(history.length - 1, 5))
       : null;
 
-    const prompt = `The user just finished a typing test: ${wpm} WPM, ${acc}% accuracy, ${raw} WPM raw.${recentAvgWpm ? ` Their recent average is ${recentAvgWpm} WPM.` : ''} ${history.length > 1 ? `That's ${wpm > recentAvgWpm ? 'above' : wpm < recentAvgWpm ? 'below' : 'right at'} their recent average.` : 'This is one of their first tests.'} Write a single short, punchy, encouraging coaching insight (1-2 sentences max). Be specific to these numbers. No preamble, no "Great job!" opener — just the insight directly.`;
+    // Structured prompt — Claude receives facts, not a narrative
+    const diagnosticPayload = {
+      result: { wpm, raw, accuracy: acc, elapsedSec: Math.round(elapsedSec) },
+      patterns: {
+        limiter: diag.limiter,
+        speedDecay: diag.speedDecay,
+        avgIntervalMs: diag.avgInterval,
+        firstHalfWpm: diag.firstHalfWpm,
+        secondHalfWpm: diag.secondHalfWpm,
+        weakChars: diag.weakChars.slice(0, 3).map(c => ({
+          char: c.char, errorRate: Math.round(c.rate * 100) + '%', occurrences: c.total
+        })),
+        slowBigrams: diag.slowBigrams.slice(0, 3).map(b => ({
+          pair: b.bigram, avgDelayMs: b.avgDelay, occurrences: b.count
+        })),
+        punctuationAccuracy: diag.punctAccuracy,
+        capitalizationAccuracy: diag.capitalAccuracy,
+      },
+      context: {
+        recentAverageWpm: recentAvg,
+        testCount: history.length,
+      },
+    };
+
+    const systemPrompt = `You are Keypace's typing coach. You receive structured diagnostic data from a user's typing test and return a brief, evidence-based coaching insight.
+
+Rules:
+- Reference only the specific metrics provided. Do not invent analysis.
+- Be direct and specific — no generic encouragement.
+- Keep it to 1-2 sentences.
+- Do not start with "Great job", "Nice work", or any filler opener.
+- Do not recommend things unrelated to the data (posture, keyboard, etc).
+- If accuracy < 92%, focus on that first.
+- If speedDecay > 15%, mention endurance.
+- If weakChars or slowBigrams exist, name the specific characters.
+- End on an actionable note.`;
+
+    const userPrompt = `Typing test diagnostics:\n${JSON.stringify(diagnosticPayload, null, 2)}\n\nWrite one coaching insight (1-2 sentences) grounded in these exact numbers.`;
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
       const res = await fetch('https://keypace-coach.keypace-coach.workers.dev', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
           max_tokens: 120,
-          messages: [{ role: 'user', content: prompt }],
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
           stream: true,
         }),
       });
 
-      if (!res.ok) throw new Error();
+      clearTimeout(timeout);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let text = '';
@@ -5911,12 +6369,168 @@ COACHING GUIDELINES:
         }
       }
       autoInsightText.className = 'ai-insight-text';
-    } catch {
+
+    } catch (err) {
+      // Deterministic fallback — always shows something useful
       autoInsightText.className = 'ai-insight-text';
-      autoInsightText.textContent = '';
-      autoInsightEl.classList.remove('show');
+      autoInsightText.textContent = buildFallbackInsight(diag);
     }
   }
+
+  function buildFallbackInsight(diag) {
+    const { wpm, accuracy, limiter, weakChars, slowBigrams, speedDecay,
+            punctAccuracy, firstHalfWpm, secondHalfWpm } = diag;
+
+    if (limiter === 'accuracy' && weakChars.length) {
+      return `Your accuracy of ${accuracy}% is holding back your real speed — "${weakChars[0].char}" alone has a ${Math.round(weakChars[0].rate * 100)}% error rate. The drill below targets it directly.`;
+    }
+    if (limiter === 'accuracy') {
+      return `${accuracy}% accuracy means roughly 1 in ${Math.round(100 / (100 - accuracy))} keystrokes is wrong — slowing down by 10% would likely net you more corrected WPM.`;
+    }
+    if (limiter === 'endurance') {
+      return `You dropped from ${firstHalfWpm} to ${secondHalfWpm} WPM in the second half — a ${speedDecay}% fade. The drill below builds pace endurance.`;
+    }
+    if (limiter === 'consistency' && slowBigrams.length) {
+      return `Your "${slowBigrams[0].bigram}" transition averaged ${slowBigrams[0].avgDelay}ms — ${Math.round(slowBigrams[0].avgDelay / diag.avgInterval * 100 - 100)}% slower than your baseline. The drill targets that pair.`;
+    }
+    if (limiter === 'punctuation') {
+      return `Punctuation accuracy was ${punctAccuracy}% — those pauses are costing you more than 5 WPM. The drill below isolates punctuation transitions.`;
+    }
+    return `${wpm} WPM at ${accuracy}% accuracy. The recommended drill targets the patterns most likely to unlock your next speed tier.`;
+  }
+
+  // ================================================================
+  // DRILL CTA + DRILL MODE
+  // ================================================================
+
+  function renderDrillCTA(drill) {
+    const existingCta = document.getElementById('drillCta');
+    if (existingCta) existingCta.remove();
+
+    const cta = document.createElement('div');
+    cta.id = 'drillCta';
+    cta.className = 'drill-cta';
+    cta.innerHTML = `
+      <div class="drill-cta-inner">
+        <div class="drill-cta-label">recommended practice</div>
+        <div class="drill-cta-title">${drill.title}</div>
+        <div class="drill-cta-rationale">${drill.rationale}</div>
+        <div class="drill-cta-goal">${drill.goal}</div>
+        <button class="btn primary drill-cta-btn" id="startDrillBtn">
+          start drill →
+        </button>
+      </div>
+    `;
+
+    // Insert before the result actions row
+    const resultActions = document.querySelector('.result-actions');
+    if (resultActions) {
+      resultActions.parentNode.insertBefore(cta, resultActions);
+    }
+
+    document.getElementById('startDrillBtn').addEventListener('click', startDrill);
+  }
+
+  // Before-drill snapshot for comparison
+  let predrillSnapshot = null;
+
+  function startDrill() {
+    if (!lastDrill || !lastDiagnostics) return;
+
+    // Save snapshot for before/after comparison
+    predrillSnapshot = {
+      wpm: lastDiagnostics.wpm,
+      accuracy: lastDiagnostics.accuracy,
+      limiter: lastDiagnostics.limiter,
+      drill: lastDrill,
+    };
+
+    // Set up state as a word-mode test using the drill's word list
+    state.mode = '_drill'; // internal mode — won't appear in history or best tracking
+    state.val  = lastDrill.words.length;
+    state.words = lastDrill.words.slice();
+
+    // Update mode buttons visually
+    modesNav.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+
+    buildTest();
+    focusInput();
+  }
+
+  // ================================================================
+  // DRILL RESULTS HANDLER
+  // Called from showResults when state.mode === '_drill'
+  // ================================================================
+
+  function showDrillResults(drillWpm, drillAcc) {
+    const snap = predrillSnapshot;
+    const wpmDiff = drillWpm - snap.wpm;
+    const accDiff = drillAcc - snap.accuracy;
+
+    const improved = drillWpm > snap.wpm || drillAcc > snap.accuracy;
+
+    let comparison = '';
+    if (Math.abs(wpmDiff) >= 2) {
+      const dir = wpmDiff > 0 ? '↑' : '↓';
+      comparison += `<span class="${wpmDiff > 0 ? 'drill-improve' : 'drill-decline'}">${dir} ${Math.abs(wpmDiff)} WPM</span>`;
+    }
+    if (Math.abs(accDiff) >= 1) {
+      if (comparison) comparison += '  ·  ';
+      const dir = accDiff > 0 ? '↑' : '↓';
+      comparison += `<span class="${accDiff > 0 ? 'drill-improve' : 'drill-decline'}">${dir} ${Math.abs(accDiff)}% accuracy</span>`;
+    }
+    if (!comparison) comparison = '<span class="drill-neutral">Similar performance — try the drill again.</span>';
+
+    // Populate result panel with drill context
+    document.getElementById('resWpm').textContent = drillWpm;
+    document.getElementById('resAcc').innerHTML   = drillAcc + '<small>%</small>';
+    document.getElementById('resRaw').textContent = Math.max(0, Math.round((state.keystrokes / 5) / ((state.endTime - state.startTime) / 60000)));
+    document.getElementById('resChars').textContent = state.typed.length;
+    document.getElementById('resTime').textContent = Math.round((state.endTime - state.startTime) / 1000) + 's';
+
+    stage.style.display = 'none';
+    restartRow.classList.add('hide');
+    result.classList.add('show');
+    coachFab.classList.add('visible');
+
+    // Hide daily panels
+    document.getElementById('dailyComparison').classList.remove('show');
+    document.getElementById('dailyLeaderboard').classList.remove('show');
+
+    requestAnimationFrame(() => drawChart());
+
+    // Replace best/prev-best with drill comparison banner
+    const existing = document.getElementById('drillComparison');
+    if (existing) existing.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'drillComparison';
+    banner.className = 'drill-comparison';
+    banner.innerHTML = `
+      <div class="drill-comparison-label">vs. previous test</div>
+      <div class="drill-comparison-diff">${comparison}</div>
+      <div class="drill-comparison-sub">${improved
+        ? `The "${snap.drill.title}" drill is working.`
+        : `Keep going — improvement takes a few reps.`}
+      </div>
+    `;
+    bestFlag.after(banner);
+
+    // Show auto-insight for the drill too
+    const elapsedSec = Math.max(1, (state.endTime - state.startTime) / 1000);
+    const diag = runDiagnostics(state, ghostTimestamps, elapsedSec);
+    lastDiagnostics = diag;
+    lastDrill = generateDrill(diag);
+    autoInsightEl.classList.add('show');
+    autoInsightText.className = 'ai-insight-text';
+    autoInsightText.textContent = buildFallbackInsight(diag);
+
+    // Offer another drill rep
+    renderDrillCTA(lastDrill);
+    predrillSnapshot = null;
+  }
+
+
 
   // ---------------- first-visit hint ----------------
   const hintOverlay = document.getElementById('hintOverlay');
