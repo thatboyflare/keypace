@@ -5,7 +5,18 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1b26'/><text x='4' y='22' font-family='monospace' font-size='18' font-weight='700' fill='%23e8b339'>k_</text></svg>" />
-<title>keypace — typing speed test</title>
+<title>Keypace — AI Typing Coach and Speed Test</title>
+<meta name="description" content="Improve your typing with personalized AI coaching. Keypace analyzes your speed, accuracy, rhythm, consistency, and mistakes to create targeted practice drills." />
+<link rel="canonical" href="https://keypace.io/" />
+<meta property="og:type"        content="website" />
+<meta property="og:url"         content="https://keypace.io/" />
+<meta property="og:title"       content="Keypace — AI Typing Coach and Speed Test" />
+<meta property="og:description" content="Every typing test should teach you something. Keypace analyzes your speed, accuracy, and mistakes — then builds a personalized practice drill." />
+<meta property="og:image"       content="https://keypace.io/og.png" />
+<meta name="twitter:card"        content="summary_large_image" />
+<meta name="twitter:title"       content="Keypace — AI Typing Coach and Speed Test" />
+<meta name="twitter:description" content="Every typing test should teach you something. Keypace analyzes your speed, accuracy, and mistakes — then builds a personalized practice drill." />
+<meta name="twitter:image"       content="https://keypace.io/og.png" />
 <script>
   // Set theme + font attributes as early as possible, before CSS/paint, so
   // there's no flash of the fallback look on load for returning visitors.
@@ -1251,6 +1262,19 @@
     font-size: 12px;
     color: var(--ink-faint);
   }
+  .drill-comparison-secondary {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-top: 2px;
+  }
+  .drill-comparison-note {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ink-faint);
+    font-style: italic;
+  }
+  .drill-retest-btn { font-size: 12px; padding: 7px 14px; }
 
 
   .daily-comparison {
@@ -2232,7 +2256,7 @@
     <div class="header-top">
       <div class="logo-wrap" id="logoWrap" style="cursor:pointer;" title="New test">
         <div class="logo"><span>keypace</span><span class="dot">_</span></div>
-        <div class="tagline">become a faster, more accurate, and more confident typist.</div>
+        <div class="tagline">AI typing coach — every test should teach you something.</div>
       </div>
       <div class="header-icons">
         <button class="icon-btn" id="perfBtn" title="Performance history" aria-label="Performance history">
@@ -2499,7 +2523,7 @@
   </main>
 
   <footer>
-    <div>made by <span class="credit">Saim Abbasi</span></div>
+    <div>made by <span class="credit">Saim Abbasi</span> · <button class="btn-text footer-link" id="privacyBtn" style="font-size:11px;color:var(--ink-faint);">privacy & AI info</button></div>
     <div class="keys">
       <span><kbd>tab</kbd> restart</span>
       <span><kbd>esc</kbd> stop</span>
@@ -2587,6 +2611,36 @@
       </button>
       <button class="btn primary" id="shareDownloadBtn">download image</button>
       <button class="btn" id="shareCopyBtn">copy image</button>
+    </div>
+  </div>
+</div>
+
+<!-- Privacy & AI transparency modal -->
+<div class="share-modal" id="privacyModal">
+  <div class="share-modal-panel" style="max-width:560px;">
+    <div class="share-modal-header">
+      <span class="share-modal-title">privacy & AI coaching info</span>
+      <button class="icon-btn" id="privacyModalCloseBtn" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div style="padding:4px 0 8px;font-family:var(--font-ui);font-size:13px;color:var(--ink-dim);line-height:1.7;max-height:70vh;overflow-y:auto;">
+      <p style="margin-bottom:12px;color:var(--ink);font-weight:600;">What Keypace analyzes</p>
+      <p>All typing analysis — WPM, accuracy, inter-key intervals, character error rates, bigram timing, hesitation patterns, and speed decay — is calculated locally in your browser. This data never leaves your device during analysis.</p>
+
+      <p style="margin:12px 0 4px;color:var(--ink);font-weight:600;">What is sent to the AI coach</p>
+      <p>After a test, a structured summary of your diagnostic metrics (e.g. "accuracy: 94%, slowest bigram: 'th' at 320ms, limiter: consistency") is sent to Anthropic's Claude API via a secure Cloudflare Worker. <strong>Your raw keystrokes, the text you typed, your email address, and your username are never sent to Anthropic.</strong></p>
+
+      <p style="margin:12px 0 4px;color:var(--ink);font-weight:600;">Data storage</p>
+      <p>Test history and personal bests are stored locally in your browser's localStorage. If you create an account and sign in, your history and bests are also stored in a Supabase database associated with your email. Raw keystroke timestamps from your 50 most recent tests are kept locally for replay purposes and are not uploaded.</p>
+
+      <p style="margin:12px 0 4px;color:var(--ink);font-weight:600;">AI coaching limitations</p>
+      <p>AI coaching insights are generated by a language model and may be imperfect or occasionally imprecise. Keypace does not provide medical, ergonomic, or physical therapy advice. Coaching is educational guidance only.</p>
+
+      <p style="margin:12px 0 4px;color:var(--ink);font-weight:600;">Deleting your data</p>
+      <p>You can clear all local data by clearing your browser's site data for keypace.io. To delete your account and cloud data, sign in and use the sign-out option — or contact <a href="mailto:contact@keypace.io" style="color:var(--accent);">contact@keypace.io</a> to request full deletion.</p>
+
+      <p style="margin-top:16px;font-size:11px;color:var(--ink-faint);">Last updated: July 2026 · <a href="https://keypace.io" style="color:var(--ink-faint);">keypace.io</a></p>
     </div>
   </div>
 </div>
@@ -2880,8 +2934,9 @@
     const genOpts = { punctuation: settings.punctuation, numbers: settings.numbers };
 
     if (state.mode === '_drill') {
-      // words already set by startDrill() — just use them as a words-mode test
-      // state.words and state.val are already set
+      // words already set by startDrill()
+    } else if (state.mode === '_retest') {
+      // words already set by startRetest()
     } else if (state.mode === 'daily') {
       state.words = genDailyWords();
       state.val = state.words.length;
@@ -2922,6 +2977,7 @@
     state.wpmHistory = [];
     state.errorsAtIndex = new Set();
     ghostTimestamps = [];
+    hiddenIntervals = [];
     clearInterval(state.timerId);
     document.body.classList.remove('is-typing');
     document.body.classList.remove('zen-mode');
@@ -3288,7 +3344,7 @@
         updateCaret(false);
         playKeySound('key');
 
-        if ((state.mode === 'words' || state.mode === 'daily' || state.mode === '_drill') && state.typed.length >= state.text.length) {
+        if ((state.mode === 'words' || state.mode === 'daily' || state.mode === '_drill' || state.mode === '_retest') && state.typed.length >= state.text.length) {
           finishTest();
           return;
         }
@@ -3313,7 +3369,7 @@
     updateCaret(false);
     playKeySound(isCorrect ? 'key' : 'error');
 
-    if ((state.mode === 'words' || state.mode === 'daily' || state.mode === '_drill') && state.typed.length >= state.text.length) {
+    if ((state.mode === 'words' || state.mode === 'daily' || state.mode === '_drill' || state.mode === '_retest') && state.typed.length >= state.text.length) {
       finishTest();
       return;
     }
@@ -3366,6 +3422,16 @@
       const drillAcc = state.keystrokes === 0 ? 100 :
         Math.max(0, Math.min(100, Math.round((state.correctKeystrokes / state.keystrokes) * 100)));
       showDrillResults(drillWpm, drillAcc);
+      return;
+    }
+
+    // Retest mode: show three-way comparison
+    if (state.mode === '_retest' && retestContext) {
+      const elapsedSec = Math.max(1, (state.endTime - state.startTime) / 1000);
+      const retestWpm = Math.max(0, Math.round((state.correctKeystrokes / 5) / (elapsedSec / 60)));
+      const retestAcc = state.keystrokes === 0 ? 100 :
+        Math.max(0, Math.min(100, Math.round((state.correctKeystrokes / state.keystrokes) * 100)));
+      showRetestResults(retestWpm, retestAcc);
       return;
     }
 
@@ -5961,122 +6027,242 @@ COACHING GUIDELINES:
   // Returns a DiagnosticResult that the coach and drill generator use.
   // ================================================================
 
+  // ================================================================
+  // DIAGNOSTIC ENGINE  v2
+  // Runs purely on captured keystroke data.
+  // All findings carry confidence metadata so the coach and drill
+  // generator can decide whether a finding is eligible for coaching.
+  // ================================================================
+
+  // Track page-visibility changes so we can exclude tab-switch pauses
+  let hiddenIntervals = []; // [{start, end}] of ms-since-test-start when page was hidden
+  (function registerVisibility() {
+    let hiddenStart = null;
+    document.addEventListener('visibilitychange', () => {
+      const now = performance.now();
+      if (document.hidden) {
+        hiddenStart = now;
+      } else if (hiddenStart !== null) {
+        // Convert to ms-since-test-start at render time using state.startTime
+        hiddenIntervals.push({ start: hiddenStart, end: now });
+        hiddenStart = null;
+      }
+    });
+  })();
+
+  // Confidence thresholds — derived from what's actually measurable
+  const CONF = {
+    CHAR_MIN_APPEARANCES: 5,      // need ≥5 typed to call a char weak
+    CHAR_MIN_ERROR_RATE:  0.25,   // ≥25% error rate required
+    BIGRAM_MIN_COUNT:     3,      // need ≥3 clean samples
+    BIGRAM_SLOW_RATIO:    1.8,    // must be ≥1.8× user's own avg interval
+    PUNCT_MIN_COUNT:      6,      // need ≥6 punctuation chars typed
+    CAPITAL_MIN_COUNT:    4,      // need ≥4 capital chars typed
+    ENDURANCE_MIN_SEC:    25,     // test must be ≥25s to diagnose endurance
+    ENDURANCE_DECAY_PCT:  18,     // must drop ≥18% to call it endurance-limited
+    WORD_MIN_APPEARANCES: 1,      // each word appears once; flag only if >50% chars wrong
+    HESITATION_RATIO:     2.8,    // pause must be ≥2.8× avg to count (tighter than before)
+    HESITATION_CHAR_MIN:  2,      // char must hesitate ≥2 times to mention
+    MAX_PAUSE_MS:         4000,   // pauses longer than this are excluded (distraction/tab)
+  };
+
+  function confidenceScore(sampleSize, minSize, errorRate, minRate) {
+    const sampleFactor = Math.min(1, sampleSize / (minSize * 2));
+    const rateFactor   = errorRate ? Math.min(1, (errorRate - minRate) / minRate) : 0;
+    return Math.round((sampleFactor * 0.6 + rateFactor * 0.4) * 100) / 100;
+  }
+
   function runDiagnostics(state, ghostTimestamps, elapsedSec) {
-    const text    = state.text;
-    const typed   = state.typed;
-    const chars   = state.chars;
-    const words   = state.words;
-    const errors  = state.errorsAtIndex; // Set of character indices
-    const ts      = ghostTimestamps;     // ms elapsed at each keypress
+    const text   = state.text;
+    const typed  = state.typed;
+    const chars  = state.chars;
+    const words  = state.words;
+    const errors = state.errorsAtIndex;
+    const ts     = ghostTimestamps;
 
-    const totalChars    = typed.length;
-    const elapsedMin    = elapsedSec / 60;
-    const correctKs     = state.correctKeystrokes;
-    const totalKs       = state.keystrokes;
-    const wpm           = Math.max(0, Math.round((correctKs / 5) / elapsedMin));
-    const raw           = Math.max(0, Math.round((totalKs / 5) / elapsedMin));
-    const accuracy      = totalKs === 0 ? 100 : Math.round((correctKs / totalKs) * 100);
+    const totalChars = typed.length;
+    const elapsedMin = elapsedSec / 60;
+    const correctKs  = state.correctKeystrokes;
+    const totalKs    = state.keystrokes;
+    const wpm        = Math.max(0, Math.round((correctKs / 5) / elapsedMin));
+    const raw        = Math.max(0, Math.round((totalKs / 5) / elapsedMin));
+    const accuracy   = totalKs === 0 ? 100 : Math.round((correctKs / totalKs) * 100);
 
-    // --- Inter-key intervals from timestamps ---
-    const intervals = [];
-    for (let i = 1; i < ts.length; i++) {
-      intervals.push(ts[i] - ts[i - 1]);
+    // --- Build a set of excluded timestamp indices ---
+    // Any interval where the page was hidden counts as a distraction pause,
+    // not a typing hesitation. We exclude these from all timing analyses.
+    const testStart = state.startTime || 0;
+    const excludedIntervals = hiddenIntervals
+      .filter(h => h.end > testStart)
+      .map(h => ({ start: h.start - testStart, end: h.end - testStart }));
+
+    function isExcluded(ms) {
+      return excludedIntervals.some(h => ms >= h.start && ms <= h.end);
     }
-    const avgInterval = intervals.length
-      ? intervals.reduce((a, b) => a + b, 0) / intervals.length
+
+    // --- Inter-key intervals (excluding distraction pauses) ---
+    const cleanIntervals = [];
+    for (let i = 1; i < ts.length; i++) {
+      const gap = ts[i] - ts[i - 1];
+      // Exclude pauses during tab-switches and pauses beyond max threshold
+      if (gap <= 0 || gap > CONF.MAX_PAUSE_MS) continue;
+      if (isExcluded(ts[i])) continue;
+      cleanIntervals.push(gap);
+    }
+    const avgInterval = cleanIntervals.length
+      ? cleanIntervals.reduce((a, b) => a + b, 0) / cleanIntervals.length
+      : 0;
+    // Median is more robust than mean for interval baseline
+    const sortedIntervals = [...cleanIntervals].sort((a, b) => a - b);
+    const medianInterval  = sortedIntervals.length
+      ? sortedIntervals[Math.floor(sortedIntervals.length / 2)]
       : 0;
 
-    // --- Speed over time (first half vs second half) ---
+    // --- Speed over time ---
     const wpmHistory = state.wpmHistory || [];
-    const halfIdx = Math.floor(wpmHistory.length / 2);
-    const firstHalfWpm = halfIdx > 0
+    const halfIdx    = Math.floor(wpmHistory.length / 2);
+    const firstHalfWpm  = halfIdx > 0
       ? Math.round(wpmHistory.slice(0, halfIdx).reduce((a, h) => a + h.wpm, 0) / halfIdx)
       : wpm;
     const secondHalfWpm = halfIdx > 0
       ? Math.round(wpmHistory.slice(halfIdx).reduce((a, h) => a + h.wpm, 0) / (wpmHistory.length - halfIdx))
       : wpm;
-    const speedDecay = firstHalfWpm > 0 ? Math.round(((firstHalfWpm - secondHalfWpm) / firstHalfWpm) * 100) : 0;
+    const speedDecay = firstHalfWpm > 0
+      ? Math.round(((firstHalfWpm - secondHalfWpm) / firstHalfWpm) * 100)
+      : 0;
+    const enduranceEligible = elapsedSec >= CONF.ENDURANCE_MIN_SEC && wpmHistory.length >= 4;
+    const enduranceFinding = enduranceEligible && speedDecay >= CONF.ENDURANCE_DECAY_PCT
+      ? {
+          metric: 'speedDecay', speedDecay, firstHalfWpm, secondHalfWpm,
+          sampleSize: wpmHistory.length,
+          confidence: speedDecay >= 25 ? 'high' : 'medium',
+          confidenceScore: Math.min(1, speedDecay / 30),
+          eligibleForCoaching: true,
+          exclusionReason: null,
+        }
+      : {
+          metric: 'speedDecay', speedDecay, firstHalfWpm, secondHalfWpm,
+          sampleSize: wpmHistory.length,
+          confidence: 'low',
+          confidenceScore: 0,
+          eligibleForCoaching: false,
+          exclusionReason: enduranceEligible
+            ? `Speed decay (${speedDecay}%) below threshold (${CONF.ENDURANCE_DECAY_PCT}%)`
+            : `Test too short (${Math.round(elapsedSec)}s) or too few WPM samples`,
+        };
 
-    // --- Error rate per character (only chars we have typing data for) ---
-    const charErrorCounts  = {};
-    const charTypedCounts  = {};
+    // --- Per-character error rates (normalized by opportunity count) ---
+    const charOpp   = {}; // appearances
+    const charErr   = {}; // errors
     for (let i = 0; i < totalChars; i++) {
-      const expected = text[i];
-      if (!expected) continue;
-      charTypedCounts[expected] = (charTypedCounts[expected] || 0) + 1;
-      if (errors.has(i)) {
-        charErrorCounts[expected] = (charErrorCounts[expected] || 0) + 1;
-      }
+      const ch = text[i];
+      if (!ch) continue;
+      charOpp[ch] = (charOpp[ch] || 0) + 1;
+      if (errors.has(i)) charErr[ch] = (charErr[ch] || 0) + 1;
     }
-
-    // Build sorted list of worst characters (min 3 appearances, >20% error rate)
-    const weakChars = Object.entries(charErrorCounts)
-      .map(([ch, errCount]) => ({
-        char: ch,
-        errors: errCount,
-        total: charTypedCounts[ch] || 1,
-        rate: errCount / (charTypedCounts[ch] || 1),
-      }))
-      .filter(c => c.total >= 3 && c.rate > 0.2)
+    const weakChars = Object.entries(charErr)
+      .map(([ch, errCount]) => {
+        const total = charOpp[ch] || 1;
+        const rate  = errCount / total;
+        const score = confidenceScore(total, CONF.CHAR_MIN_APPEARANCES, rate, CONF.CHAR_MIN_ERROR_RATE);
+        const eligible = total >= CONF.CHAR_MIN_APPEARANCES && rate >= CONF.CHAR_MIN_ERROR_RATE;
+        return {
+          char: ch, errors: errCount, total, rate: Math.round(rate * 100) / 100,
+          confidence: eligible && score > 0.6 ? 'high' : eligible ? 'medium' : 'low',
+          confidenceScore: score,
+          eligibleForCoaching: eligible,
+          exclusionReason: eligible ? null
+            : total < CONF.CHAR_MIN_APPEARANCES
+              ? `Only ${total} appearance${total === 1 ? '' : 's'} (need ${CONF.CHAR_MIN_APPEARANCES})`
+              : `Error rate ${Math.round(rate * 100)}% below threshold`,
+        };
+      })
+      .filter(c => c.eligibleForCoaching)
       .sort((a, b) => b.rate - a.rate)
       .slice(0, 5);
 
-    // --- Slowest bigrams (pairs of consecutive characters) ---
-    // Map each bigram to its average inter-key delay
+    // --- Slow bigrams (user-baseline relative, not global threshold) ---
     const bigramDelays = {};
     const bigramCounts = {};
     for (let i = 0; i + 1 < totalChars && i + 1 < ts.length; i++) {
-      if (errors.has(i) || errors.has(i + 1)) continue; // only clean presses
-      const bigram = text[i] + text[i + 1];
-      const delay  = ts[i + 1] - ts[i];
-      if (delay < 0 || delay > 3000) continue; // skip pauses > 3s (distraction)
-      bigramDelays[bigram] = (bigramDelays[bigram] || 0) + delay;
-      bigramCounts[bigram] = (bigramCounts[bigram] || 0) + 1;
+      if (errors.has(i) || errors.has(i + 1)) continue;
+      const gap = ts[i + 1] - ts[i];
+      if (gap <= 0 || gap > CONF.MAX_PAUSE_MS) continue;
+      if (isExcluded(ts[i + 1])) continue;
+      const bg = text[i] + text[i + 1];
+      bigramDelays[bg] = (bigramDelays[bg] || 0) + gap;
+      bigramCounts[bg] = (bigramCounts[bg] || 0) + 1;
     }
     const slowBigrams = Object.entries(bigramDelays)
-      .map(([bg, total]) => ({
-        bigram: bg,
-        avgDelay: Math.round(total / bigramCounts[bg]),
-        count: bigramCounts[bg],
-      }))
-      .filter(b => b.count >= 2 && b.avgDelay > avgInterval * 1.6)
+      .map(([bg, total]) => {
+        const count    = bigramCounts[bg];
+        const avgDelay = Math.round(total / count);
+        const ratio    = medianInterval > 0 ? avgDelay / medianInterval : 0;
+        const eligible = count >= CONF.BIGRAM_MIN_COUNT && ratio >= CONF.BIGRAM_SLOW_RATIO;
+        const score    = eligible
+          ? Math.min(1, (count / (CONF.BIGRAM_MIN_COUNT * 2)) * 0.5 + ((ratio - CONF.BIGRAM_SLOW_RATIO) / 2) * 0.5)
+          : 0;
+        return {
+          bigram: bg, avgDelay, count,
+          ratioToBaseline: Math.round(ratio * 100) / 100,
+          baselineMs: Math.round(medianInterval),
+          confidence: eligible && count >= 5 ? 'high' : eligible ? 'medium' : 'low',
+          confidenceScore: Math.round(score * 100) / 100,
+          eligibleForCoaching: eligible,
+          exclusionReason: eligible ? null
+            : count < CONF.BIGRAM_MIN_COUNT
+              ? `Only ${count} clean sample${count === 1 ? '' : 's'} (need ${CONF.BIGRAM_MIN_COUNT})`
+              : `${avgDelay}ms is ${Math.round(ratio * 100)}% of baseline — below ${Math.round(CONF.BIGRAM_SLOW_RATIO * 100)}% threshold`,
+        };
+      })
+      .filter(b => b.eligibleForCoaching)
       .sort((a, b) => b.avgDelay - a.avgDelay)
       .slice(0, 5);
 
-    // --- Hesitation points (long pauses before specific chars) ---
-    const hesitations = [];
-    for (let i = 1; i < ts.length; i++) {
-      const delay = ts[i] - ts[i - 1];
-      if (delay > avgInterval * 2.5 && delay < 5000) {
-        hesitations.push({ charIndex: i, char: text[i] || '', delay });
-      }
-    }
+    // --- Hesitation points (excluding tab-switch pauses) ---
     const hesitatedChars = {};
-    hesitations.forEach(h => {
-      if (!h.char.trim()) return;
-      hesitatedChars[h.char] = (hesitatedChars[h.char] || 0) + 1;
+    for (let i = 1; i < ts.length; i++) {
+      const gap = ts[i] - ts[i - 1];
+      if (gap < avgInterval * CONF.HESITATION_RATIO) continue;
+      if (gap > CONF.MAX_PAUSE_MS) continue;
+      if (isExcluded(ts[i])) continue;
+      const ch = (text[i] || '').trim();
+      if (!ch) continue;
+      hesitatedChars[ch] = (hesitatedChars[ch] || 0) + 1;
+    }
+    // Only keep chars that hesitated multiple times
+    Object.keys(hesitatedChars).forEach(ch => {
+      if (hesitatedChars[ch] < CONF.HESITATION_CHAR_MIN) delete hesitatedChars[ch];
     });
 
-    // --- Punctuation & capitalization performance ---
+    // --- Punctuation & capitalization (with minimum sample guards) ---
     const PUNCT = new Set('.,!?;:\'"()[]{}');
     let punctTyped = 0, punctErrors = 0;
     let capitalTyped = 0, capitalErrors = 0;
     for (let i = 0; i < totalChars; i++) {
       const ch = text[i];
       if (!ch) continue;
-      if (PUNCT.has(ch)) {
-        punctTyped++;
-        if (errors.has(i)) punctErrors++;
-      }
-      if (ch >= 'A' && ch <= 'Z') {
-        capitalTyped++;
-        if (errors.has(i)) capitalErrors++;
-      }
+      if (PUNCT.has(ch)) { punctTyped++; if (errors.has(i)) punctErrors++; }
+      if (ch >= 'A' && ch <= 'Z') { capitalTyped++; if (errors.has(i)) capitalErrors++; }
     }
-    const punctAccuracy = punctTyped > 0
-      ? Math.round((1 - punctErrors / punctTyped) * 100) : null;
-    const capitalAccuracy = capitalTyped > 0
-      ? Math.round((1 - capitalErrors / capitalTyped) * 100) : null;
+    const punctAccuracy = punctTyped >= CONF.PUNCT_MIN_COUNT
+      ? Math.round((1 - punctErrors / punctTyped) * 100)
+      : null;
+    const capitalAccuracy = capitalTyped >= CONF.CAPITAL_MIN_COUNT
+      ? Math.round((1 - capitalErrors / capitalTyped) * 100)
+      : null;
+
+    const punctFinding = punctTyped >= CONF.PUNCT_MIN_COUNT
+      ? {
+          accuracy: punctAccuracy, typed: punctTyped, errors: punctErrors,
+          eligibleForCoaching: punctAccuracy !== null && punctAccuracy < 90,
+          exclusionReason: punctAccuracy >= 90 ? 'Punctuation accuracy sufficient' : null,
+        }
+      : {
+          accuracy: null, typed: punctTyped, errors: punctErrors,
+          eligibleForCoaching: false,
+          exclusionReason: `Only ${punctTyped} punctuation chars (need ${CONF.PUNCT_MIN_COUNT})`,
+        };
 
     // --- Error-prone words ---
     let charPos = 0;
@@ -6085,34 +6271,43 @@ COACHING GUIDELINES:
       for (let j = 0; j < word.length; j++) {
         if (charPos + j < totalChars && errors.has(charPos + j)) errCount++;
       }
-      charPos += word.length + 1; // +1 for space
+      charPos += word.length + 1;
       return { word, errors: errCount, length: word.length };
-    }).filter(w => w.errors > 0)
+    }).filter(w => w.errors > 0 && w.errors / w.length > 0.4) // >40% chars wrong
       .sort((a, b) => (b.errors / b.length) - (a.errors / a.length))
       .slice(0, 8);
 
-    // --- Primary limiter (what's holding the user back the most) ---
+    // --- Primary limiter — ordered by evidence strength ---
     let limiter = 'speed';
-    if (accuracy < 92) limiter = 'accuracy';
-    else if (speedDecay > 15) limiter = 'endurance';
-    else if (slowBigrams.length >= 3) limiter = 'consistency';
-    else if (weakChars.length >= 2) limiter = 'specific_chars';
-    else if (punctAccuracy !== null && punctAccuracy < 85 && punctTyped >= 5) limiter = 'punctuation';
+    if (accuracy < 90) {
+      limiter = 'accuracy';
+    } else if (enduranceFinding.eligibleForCoaching) {
+      limiter = 'endurance';
+    } else if (slowBigrams.length >= 2) {
+      limiter = 'consistency';
+    } else if (weakChars.length >= 1) {
+      limiter = 'specific_chars';
+    } else if (punctFinding.eligibleForCoaching) {
+      limiter = 'punctuation';
+    }
 
     return {
       wpm, raw, accuracy,
       totalChars, elapsedSec,
       avgInterval: Math.round(avgInterval),
+      medianInterval: Math.round(medianInterval),
       firstHalfWpm, secondHalfWpm, speedDecay,
       weakChars,
       slowBigrams,
       hesitatedChars,
       wordErrors,
-      punctTyped, punctAccuracy,
-      capitalTyped, capitalAccuracy,
+      punctTyped, punctAccuracy, punctErrors,
+      capitalTyped, capitalAccuracy, capitalErrors,
+      enduranceFinding,
+      punctFinding,
       limiter,
-      hasTimingData: ts.length > 10,
-      hasEnoughData: totalChars > 20,
+      hasTimingData: cleanIntervals.length > 10,
+      hasEnoughData: totalChars > 30,
     };
   }
 
@@ -6126,9 +6321,11 @@ COACHING GUIDELINES:
 
   function generateDrill(diag) {
     const { limiter, weakChars, slowBigrams, wordErrors, punctAccuracy,
-            capitalAccuracy, speedDecay, accuracy } = diag;
+            capitalAccuracy, speedDecay, accuracy, punctFinding,
+            enduranceFinding, medianInterval } = diag;
 
     let drillType, title, rationale, targetMetric, goal, words;
+    let baselineValue, targetValue, unit, measurementMethod;
 
     if (limiter === 'accuracy' || limiter === 'specific_chars') {
       const topWeakChars = weakChars.slice(0, 3).map(c => c.char);
@@ -6137,47 +6334,71 @@ COACHING GUIDELINES:
         ? `Fix "${topWeakChars.join('", "')}" errors`
         : 'Accuracy drill';
       rationale = topWeakChars.length
-        ? `You missed "${topWeakChars.join('", "')}" most often. This drill packs them into every word.`
+        ? `You missed "${topWeakChars[0]}" ${Math.round(weakChars[0].rate * 100)}% of the time (${weakChars[0].errors}/${weakChars[0].total} appearances). This drill packs it into every word.`
         : `Your accuracy was ${accuracy}%. Slow down slightly and focus on clean keystrokes.`;
-      targetMetric = 'accuracy';
-      goal = `Reach ${Math.min(accuracy + 5, 98)}% accuracy`;
+      targetMetric = topWeakChars.length ? 'char_error_rate' : 'accuracy';
+      baselineValue = topWeakChars.length ? Math.round(weakChars[0].rate * 100) : accuracy;
+      targetValue   = topWeakChars.length ? Math.max(0, baselineValue - 15) : Math.min(98, accuracy + 5);
+      unit          = '%';
+      measurementMethod = topWeakChars.length
+        ? `Error rate for "${topWeakChars[0]}" during drill`
+        : 'Overall accuracy during drill';
+      goal = topWeakChars.length
+        ? `Reduce "${topWeakChars[0]}" error rate from ${baselineValue}% to under ${targetValue}%`
+        : `Reach ${targetValue}% accuracy`;
       words = buildCharFocusDrill(topWeakChars.length ? topWeakChars : null);
 
     } else if (limiter === 'punctuation') {
       drillType = 'punctuation';
       title = 'Punctuation rhythm';
-      rationale = `Your punctuation accuracy was ${punctAccuracy}% — punctuation pauses were disrupting your flow.`;
-      targetMetric = 'punctuation_accuracy';
-      goal = 'Hit 90%+ punctuation accuracy';
+      rationale = `Your punctuation accuracy was ${punctAccuracy}% (${punctFinding.errors} errors from ${punctFinding.typed} chances). This drill isolates punctuation transitions.`;
+      targetMetric  = 'punctuation_accuracy';
+      baselineValue = punctAccuracy;
+      targetValue   = Math.min(95, punctAccuracy + 8);
+      unit          = '%';
+      measurementMethod = 'Punctuation character accuracy during drill';
+      goal = `Improve punctuation accuracy from ${punctAccuracy}% to ${targetValue}%`;
       words = buildPunctuationDrill();
 
     } else if (limiter === 'endurance') {
       drillType = 'endurance';
       title = 'Endurance pace';
-      rationale = `Your speed dropped ${diag.speedDecay}% in the second half of the test. This drill helps you maintain pace.`;
-      targetMetric = 'speed_consistency';
-      goal = `Keep second-half WPM within 10% of first half`;
+      rationale = `Your speed dropped ${speedDecay}% in the second half (${diag.firstHalfWpm} → ${diag.secondHalfWpm} WPM). This drill builds sustained pace.`;
+      targetMetric  = 'speed_decay';
+      baselineValue = speedDecay;
+      targetValue   = Math.max(0, speedDecay - 8);
+      unit          = '% decay';
+      measurementMethod = 'Speed drop from first to second half of drill';
+      goal = `Keep speed decay under ${targetValue}% (currently ${speedDecay}%)`;
       words = buildEnduranceDrill();
 
     } else if (limiter === 'consistency' && slowBigrams.length) {
       const topBigrams = slowBigrams.slice(0, 3).map(b => b.bigram);
+      const topBigram  = slowBigrams[0];
       drillType = 'bigram';
       title = `"${topBigrams[0]}" rhythm drill`;
-      rationale = `You hesitated most on "${topBigrams.join('", "')}" — these transitions averaged ${slowBigrams[0].avgDelay}ms, well above your baseline.`;
-      targetMetric = 'consistency';
-      goal = `Smooth out the "${topBigrams[0]}" transition`;
+      rationale = `Your "${topBigrams[0]}" transition averaged ${topBigram.avgDelay}ms — ${Math.round(topBigram.ratioToBaseline * 100)}% of your ${topBigram.baselineMs}ms baseline. This drill targets that pair.`;
+      targetMetric  = 'bigram_delay';
+      baselineValue = topBigram.avgDelay;
+      targetValue   = Math.round(topBigram.avgDelay * 0.85);
+      unit          = 'ms';
+      measurementMethod = `Average inter-key delay for "${topBigrams[0]}" during drill`;
+      goal = `Reduce "${topBigrams[0]}" delay from ${baselineValue}ms to under ${targetValue}ms`;
       words = buildBigramDrill(topBigrams);
 
     } else {
-      // Default: speed drill with commonly slow words from this test
       const slowWords = wordErrors.slice(0, 5).map(w => w.word);
       drillType = 'speed';
       title = 'Speed and flow drill';
       rationale = slowWords.length
-        ? `You stumbled on "${slowWords.join('", "')}" — this drill repeats them in different contexts.`
-        : `Push your clean WPM higher with this focused drill.`;
-      targetMetric = 'wpm';
-      goal = `Beat ${diag.wpm + 3} WPM with 95%+ accuracy`;
+        ? `You stumbled on "${slowWords.slice(0, 3).join('", "')}" — this drill repeats them with varied context.`
+        : 'Push your clean WPM higher with this focused drill.';
+      targetMetric  = 'wpm';
+      baselineValue = diag.wpm;
+      targetValue   = diag.wpm + 4;
+      unit          = 'WPM';
+      measurementMethod = 'WPM during drill at ≥95% accuracy';
+      goal = `Beat ${targetValue} WPM at 95%+ accuracy`;
       words = slowWords.length ? buildWordFocusDrill(slowWords) : buildSpeedDrill();
     }
 
@@ -6186,10 +6407,20 @@ COACHING GUIDELINES:
       title,
       rationale,
       targetMetric,
+      baselineValue,
+      targetValue,
+      unit,
+      measurementMethod,
       goal,
       words,
-      durationSec: 30, // same as current default test
-      basedOn: { limiter, weakChars: weakChars.slice(0, 3), slowBigrams: slowBigrams.slice(0, 3) },
+      durationSec: 30,
+      basedOn: {
+        limiter,
+        weakChars: weakChars.slice(0, 3),
+        slowBigrams: slowBigrams.slice(0, 3),
+        targetChars: drillType === 'char_accuracy' ? weakChars.slice(0, 3).map(c => c.char) : [],
+        targetBigrams: drillType === 'bigram' ? slowBigrams.slice(0, 3).map(b => b.bigram) : [],
+      },
     };
   }
 
@@ -6462,107 +6693,304 @@ Rules:
   // Called from showResults when state.mode === '_drill'
   // ================================================================
 
+  // Safe HTML escape for user-facing strings from diagnostic data
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // Measure the drill's specific target metric from post-drill diagnostics
+  function measureTargetMetric(drill, drillDiag, drillWpm, drillAcc) {
+    const { drillType, basedOn, baselineValue, targetValue } = drill;
+
+    switch (drillType) {
+      case 'char_accuracy': {
+        const targetChars = basedOn.targetChars || [];
+        if (!targetChars.length) {
+          return { label: 'Accuracy', baseline: baselineValue, result: drillAcc, unit: '%', met: drillAcc > baselineValue };
+        }
+        const targetChar    = targetChars[0];
+        const drillWeakChar = drillDiag.weakChars.find(c => c.char === targetChar);
+        const drillRate     = drillWeakChar ? Math.round(drillWeakChar.rate * 100) : 0;
+        return {
+          label: `"${targetChar}" error rate`,
+          baseline: baselineValue, result: drillRate, unit: '%',
+          met: drillRate <= targetValue,
+          sampleNote: drillWeakChar ? `(${drillWeakChar.total} appearances)` : '(no errors in drill)',
+        };
+      }
+      case 'punctuation': {
+        const result = drillDiag.punctAccuracy ?? drillAcc;
+        const low    = drillDiag.punctTyped < 4;
+        return {
+          label: 'Punctuation accuracy',
+          baseline: baselineValue, result, unit: '%',
+          met: result >= targetValue, insufficientSamples: low,
+          sampleNote: low
+            ? `Only ${drillDiag.punctTyped} punctuation chars — too few to measure`
+            : `(${drillDiag.punctTyped} chars)`,
+        };
+      }
+      case 'endurance': {
+        const low = !drillDiag.enduranceFinding.eligibleForCoaching;
+        return {
+          label: 'Speed decay',
+          baseline: baselineValue, result: drillDiag.speedDecay, unit: '% drop',
+          met: drillDiag.speedDecay <= targetValue, insufficientSamples: low,
+          sampleNote: low ? drillDiag.enduranceFinding.exclusionReason
+            : `${drillDiag.firstHalfWpm} → ${drillDiag.secondHalfWpm} WPM`,
+        };
+      }
+      case 'bigram': {
+        const tgt = basedOn.targetBigrams?.[0];
+        if (!tgt) return { label: 'WPM', baseline: baselineValue, result: drillWpm, unit: 'WPM', met: drillWpm > baselineValue };
+        const db  = drillDiag.slowBigrams.find(b => b.bigram === tgt);
+        const res = db ? db.avgDelay : Math.round(drillDiag.medianInterval * 1.1);
+        const low = db ? db.count < CONF.BIGRAM_MIN_COUNT : false;
+        return {
+          label: `"${tgt}" transition`,
+          baseline: baselineValue, result: res, unit: 'ms',
+          met: res <= targetValue, insufficientSamples: low,
+          sampleNote: db ? `(${db.count} samples)` : `"${tgt}" not slow in drill`,
+        };
+      }
+      default:
+        return { label: 'WPM', baseline: baselineValue, result: drillWpm, unit: 'WPM', met: drillWpm >= targetValue };
+    }
+  }
+
   function showDrillResults(drillWpm, drillAcc) {
-    const snap = predrillSnapshot;
-    const wpmDiff = drillWpm - snap.wpm;
-    const accDiff = drillAcc - snap.accuracy;
-    const improved = drillWpm > snap.wpm || drillAcc > snap.accuracy;
-
-    let comparison = '';
-    if (Math.abs(wpmDiff) >= 2) {
-      const dir = wpmDiff > 0 ? '↑' : '↓';
-      comparison += `<span class="${wpmDiff > 0 ? 'drill-improve' : 'drill-decline'}">${dir} ${Math.abs(wpmDiff)} WPM</span>`;
-    }
-    if (Math.abs(accDiff) >= 1) {
-      if (comparison) comparison += '  ·  ';
-      const dir = accDiff > 0 ? '↑' : '↓';
-      comparison += `<span class="${accDiff > 0 ? 'drill-improve' : 'drill-decline'}">${dir} ${Math.abs(accDiff)}% accuracy</span>`;
-    }
-    if (!comparison) comparison = '<span class="drill-neutral">Similar performance — try the drill again.</span>';
-
-    // Populate result stats
-    document.getElementById('resWpm').textContent   = drillWpm;
-    document.getElementById('resAcc').innerHTML     = drillAcc + '<small>%</small>';
-    const elapsedMs = state.endTime - state.startTime;
-    const elapsedMin = Math.max(0.001, elapsedMs / 60000);
-    document.getElementById('resRaw').textContent   = Math.max(0, Math.round((state.keystrokes / 5) / elapsedMin));
-    document.getElementById('resChars').textContent = state.typed.length;
-    document.getElementById('resTime').textContent  = Math.round(elapsedMs / 1000) + 's';
-
-    // Build a synthetic wpmHistory so the chart has data to render.
-    // Divide the test into ~10 equal buckets using ghostTimestamps.
+    const snap       = predrillSnapshot;
+    const elapsedMs  = state.endTime - state.startTime;
     const elapsedSec = Math.max(1, elapsedMs / 1000);
+    const elapsedMin = elapsedSec / 60;
+
+    // Build synthetic wpmHistory for the chart
     if (ghostTimestamps.length > 5) {
-      const buckets = Math.min(10, Math.floor(ghostTimestamps.length / 3));
-      const bucketSize = Math.floor(ghostTimestamps.length / buckets);
+      const buckets  = Math.min(10, Math.floor(ghostTimestamps.length / 3));
+      const bktSize  = Math.floor(ghostTimestamps.length / buckets);
       state.wpmHistory = [];
       for (let b = 0; b < buckets; b++) {
-        const endIdx  = Math.min((b + 1) * bucketSize, ghostTimestamps.length) - 1;
-        const endMs   = ghostTimestamps[endIdx];
-        const correctInBucket = state.chars
-          .slice(0, endIdx + 1)
-          .filter(c => c.status === 'correct').length;
-        const bWpm = Math.round((correctInBucket / 5) / (endMs / 60000));
-        const bRaw = Math.round(((endIdx + 1) / 5) / (endMs / 60000));
+        const endIdx = Math.min((b + 1) * bktSize, ghostTimestamps.length) - 1;
+        const endMs  = ghostTimestamps[endIdx];
+        const corr   = state.chars.slice(0, endIdx + 1).filter(c => c.status === 'correct').length;
+        const bWpm   = endMs > 0 ? Math.round((corr / 5) / (endMs / 60000)) : 0;
+        const bRaw   = endMs > 0 ? Math.round(((endIdx + 1) / 5) / (endMs / 60000)) : 0;
         state.wpmHistory.push({ t: b + 1, wpm: Math.max(0, bWpm), raw: Math.max(0, bRaw) });
       }
     } else {
-      // Fallback: single point
       state.wpmHistory = [{ t: 1, wpm: drillWpm, raw: Math.max(drillWpm, Math.round(state.keystrokes / 5 / elapsedMin)) }];
     }
 
-    // Show result panel
+    // Run diagnostics on the drill to measure the target metric
+    const drillDiag     = runDiagnostics(state, ghostTimestamps, elapsedSec);
+    const targetMeasure = measureTargetMetric(snap.drill, drillDiag, drillWpm, drillAcc);
+
+    // Build primary comparison (target-metric specific)
+    const lowerIsBetter = ['char_accuracy', 'punctuation', 'endurance', 'bigram'].some(t =>
+      snap.drill.drillType === t && ['char_error_rate','speed_decay','bigram_delay'].includes(snap.drill.targetMetric)
+    );
+    let primaryHtml;
+    if (targetMeasure.insufficientSamples) {
+      primaryHtml = `<span class="drill-neutral">Not enough samples to measure ${escHtml(targetMeasure.label)}.</span>`;
+      if (targetMeasure.sampleNote) primaryHtml += ` <span class="drill-comparison-note">${escHtml(targetMeasure.sampleNote)}</span>`;
+    } else {
+      const delta    = targetMeasure.result - targetMeasure.baseline;
+      const improved = lowerIsBetter ? delta < -1 : delta > 1;
+      const declined = lowerIsBetter ? delta > 2  : delta < -2;
+      const arrow = improved ? '↑' : declined ? '↓' : '→';
+      const cls   = improved ? 'drill-improve' : declined ? 'drill-decline' : 'drill-neutral';
+      primaryHtml = `<span class="${cls}">${arrow} ${escHtml(targetMeasure.label)}: ${escHtml(String(targetMeasure.baseline))}${escHtml(targetMeasure.unit)} → ${escHtml(String(targetMeasure.result))}${escHtml(targetMeasure.unit)}</span>`;
+      if (targetMeasure.sampleNote) primaryHtml += ` <span class="drill-comparison-note">${escHtml(targetMeasure.sampleNote)}</span>`;
+    }
+
+    // Secondary context
+    const wpmDiff  = drillWpm - snap.wpm;
+    const accDiff  = drillAcc - snap.accuracy;
+    const secParts = [];
+    if (Math.abs(wpmDiff) >= 3) secParts.push(`${wpmDiff > 0 ? '+' : ''}${wpmDiff} WPM`);
+    if (Math.abs(accDiff) >= 2) secParts.push(`${accDiff > 0 ? '+' : ''}${accDiff}% acc`);
+
+    // Populate stats
+    document.getElementById('resWpm').textContent   = drillWpm;
+    document.getElementById('resAcc').innerHTML     = drillAcc + '<small>%</small>';
+    document.getElementById('resRaw').textContent   = Math.max(0, Math.round((state.keystrokes / 5) / elapsedMin));
+    document.getElementById('resChars').textContent = state.typed.length;
+    document.getElementById('resTime').textContent  = Math.round(elapsedSec) + 's';
+
     stage.style.display = 'none';
     restartRow.classList.add('hide');
     result.classList.add('show');
     coachFab.classList.add('visible');
-
     document.getElementById('dailyComparison').classList.remove('show');
     document.getElementById('dailyLeaderboard').classList.remove('show');
-
-    // Hide normal best/prev-best — not relevant for drills
     bestFlag.classList.remove('show');
     prevBest.textContent = '';
 
-    // Draw chart after panel is visible
     requestAnimationFrame(() => drawChart());
 
-    // Inject drill comparison banner — insert it AFTER result-grid (not inside it)
     const existing = document.getElementById('drillComparison');
     if (existing) existing.remove();
     const banner = document.createElement('div');
     banner.id = 'drillComparison';
     banner.className = 'drill-comparison';
     banner.innerHTML = `
-      <div class="drill-comparison-label">vs. previous test</div>
-      <div class="drill-comparison-diff">${comparison}</div>
-      <div class="drill-comparison-sub">${improved
-        ? `The "${snap.drill.title}" drill is working.`
-        : 'Keep going — improvement takes a few reps.'}</div>
+      <div class="drill-comparison-label">drill result · ${escHtml(snap.drill.title)}</div>
+      <div class="drill-comparison-diff">${primaryHtml}</div>
+      ${secParts.length ? `<div class="drill-comparison-secondary">${escHtml(secParts.join(' · '))}</div>` : ''}
+      <div class="drill-comparison-sub">${
+        targetMeasure.met
+          ? 'Target met — take a standardized retest to confirm the improvement transfers to normal typing.'
+          : targetMeasure.insufficientSamples
+            ? 'Try a longer session to collect enough samples for reliable measurement.'
+            : 'Not there yet. Repeat the drill or try the standardized retest to check transfer.'
+      }</div>
+      <button class="btn primary drill-retest-btn" id="retestBtn" style="margin-top:10px;">
+        standardized retest →
+      </button>
     `;
-    // Insert after .result-grid, before .result-actions
-    const resultGrid    = result.querySelector('.result-grid');
-    const resultActions = result.querySelector('.result-actions');
-    result.insertBefore(banner, resultActions);
+    result.insertBefore(banner, result.querySelector('.result-actions'));
+    document.getElementById('retestBtn').addEventListener('click', () => startRetest(snap, targetMeasure));
 
-    // Auto-insight (deterministic fallback — no AI call for drill results)
-    const diag = runDiagnostics(state, ghostTimestamps, elapsedSec);
-    lastDiagnostics = diag;
-    lastDrill = generateDrill(diag);
+    lastDiagnostics = drillDiag;
+    lastDrill = generateDrill(drillDiag);
     autoInsightEl.classList.add('show');
     autoInsightText.className = 'ai-insight-text';
-    autoInsightText.textContent = buildFallbackInsight(diag);
+    autoInsightText.textContent = buildFallbackInsight(drillDiag);
 
-    // Offer another drill rep
     renderDrillCTA(lastDrill);
-
-    // Update history strip with current history (drill doesn't add to history)
     renderHistory();
-
     predrillSnapshot = null;
   }
 
+  // ================================================================
+  // STANDARDIZED RETEST
+  // Normal-content word test so the result is directly comparable
+  // to the original test. Not saved to history or personal bests.
+  // ================================================================
 
+  let retestContext = null;
+
+  function startRetest(originalSnap, drillMeasure) {
+    retestContext = { originalSnap, drillMeasure };
+    state.mode  = '_retest';
+    state.val   = 30;
+    state.words = genWords(30, { punctuation: settings.punctuation, numbers: settings.numbers });
+    modesNav.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    buildTest();
+    focusInput();
+  }
+
+  function showRetestResults(retestWpm, retestAcc) {
+    const { originalSnap, drillMeasure } = retestContext;
+    const elapsedMs  = state.endTime - state.startTime;
+    const elapsedSec = Math.max(1, elapsedMs / 1000);
+    const elapsedMin = elapsedSec / 60;
+
+    // Build chart data
+    if (ghostTimestamps.length > 5) {
+      const buckets = Math.min(10, Math.floor(ghostTimestamps.length / 3));
+      const bktSize = Math.floor(ghostTimestamps.length / buckets);
+      state.wpmHistory = [];
+      for (let b = 0; b < buckets; b++) {
+        const endIdx = Math.min((b + 1) * bktSize, ghostTimestamps.length) - 1;
+        const endMs  = ghostTimestamps[endIdx];
+        const corr   = state.chars.slice(0, endIdx + 1).filter(c => c.status === 'correct').length;
+        state.wpmHistory.push({
+          t: b + 1,
+          wpm: endMs > 0 ? Math.max(0, Math.round((corr / 5) / (endMs / 60000))) : 0,
+          raw: endMs > 0 ? Math.max(0, Math.round(((endIdx + 1) / 5) / (endMs / 60000))) : 0,
+        });
+      }
+    } else {
+      state.wpmHistory = [{ t: 1, wpm: retestWpm, raw: Math.max(retestWpm, Math.round(state.keystrokes / 5 / elapsedMin)) }];
+    }
+
+    // Measure the target metric in the retest
+    const retestDiag    = runDiagnostics(state, ghostTimestamps, elapsedSec);
+    const retestMeasure = measureTargetMetric(originalSnap.drill, retestDiag, retestWpm, retestAcc);
+
+    // Determine verdict
+    const orig = drillMeasure;
+    const lowerIsBetter = orig.unit === 'ms' || orig.unit === '% drop' || orig.label.includes('error rate');
+
+    const retestDelta = retestMeasure.result - orig.baseline;
+    const improved    = lowerIsBetter ? retestDelta < -2 : retestDelta > 2;
+    const mixed       = !improved && (retestWpm > originalSnap.wpm + 2 || retestAcc > originalSnap.accuracy + 2);
+
+    let verdict, verdictCls;
+    if (retestMeasure.insufficientSamples) {
+      verdict = 'Insufficient samples in retest — result inconclusive.';
+      verdictCls = 'drill-neutral';
+    } else if (improved) {
+      verdict = `Improvement verified. ${retestMeasure.label} improved from ${orig.baseline}${orig.unit} to ${retestMeasure.result}${retestMeasure.unit} in a standard test.`;
+      verdictCls = 'drill-improve';
+    } else if (mixed) {
+      verdict = `Mixed result — overall WPM/accuracy improved but target metric (${retestMeasure.label}) did not change meaningfully yet.`;
+      verdictCls = 'drill-neutral';
+    } else {
+      verdict = `No meaningful change yet in ${retestMeasure.label}. More practice reps are likely needed before the skill transfers.`;
+      verdictCls = 'drill-neutral';
+    }
+
+    document.getElementById('resWpm').textContent   = retestWpm;
+    document.getElementById('resAcc').innerHTML     = retestAcc + '<small>%</small>';
+    document.getElementById('resRaw').textContent   = Math.max(0, Math.round((state.keystrokes / 5) / elapsedMin));
+    document.getElementById('resChars').textContent = state.typed.length;
+    document.getElementById('resTime').textContent  = Math.round(elapsedSec) + 's';
+
+    stage.style.display = 'none';
+    restartRow.classList.add('hide');
+    result.classList.add('show');
+    coachFab.classList.add('visible');
+    document.getElementById('dailyComparison').classList.remove('show');
+    document.getElementById('dailyLeaderboard').classList.remove('show');
+    bestFlag.classList.remove('show');
+    prevBest.textContent = '';
+
+    requestAnimationFrame(() => drawChart());
+
+    const existing = document.getElementById('drillComparison');
+    if (existing) existing.remove();
+    const banner = document.createElement('div');
+    banner.id = 'drillComparison';
+    banner.className = 'drill-comparison';
+    banner.innerHTML = `
+      <div class="drill-comparison-label">standardized retest — ${escHtml(originalSnap.drill.title)}</div>
+      <div class="drill-comparison-diff"><span class="${verdictCls}">${escHtml(verdict)}</span></div>
+      <div class="drill-comparison-secondary">
+        Original: ${escHtml(String(orig.baseline))}${escHtml(orig.unit)} · Retest: ${escHtml(String(retestMeasure.result))}${escHtml(retestMeasure.unit)}
+        ${retestMeasure.sampleNote ? `<span class="drill-comparison-note"> ${escHtml(retestMeasure.sampleNote)}</span>` : ''}
+      </div>
+    `;
+    result.insertBefore(banner, result.querySelector('.result-actions'));
+
+    lastDiagnostics = retestDiag;
+    lastDrill = generateDrill(retestDiag);
+    autoInsightEl.classList.add('show');
+    autoInsightText.className = 'ai-insight-text';
+    autoInsightText.textContent = buildFallbackInsight(retestDiag);
+    renderDrillCTA(lastDrill);
+    renderHistory();
+    retestContext = null;
+  }
+
+
+
+
+
+  // ---------------- privacy modal ----------------
+  document.getElementById('privacyBtn').addEventListener('click', () => {
+    document.getElementById('privacyModal').classList.add('show');
+  });
+  document.getElementById('privacyModalCloseBtn').addEventListener('click', () => {
+    document.getElementById('privacyModal').classList.remove('show');
+  });
+  document.getElementById('privacyModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('privacyModal'))
+      document.getElementById('privacyModal').classList.remove('show');
+  });
 
   // ---------------- first-visit hint ----------------
   const hintOverlay = document.getElementById('hintOverlay');
