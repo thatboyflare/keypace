@@ -5391,17 +5391,14 @@
       document.getElementById('accountSyncStatus').textContent = 'Signed in — stats sync automatically.';
       btn.classList.add('account-active');
 
-      // Capture the cached value right now — don't read currentUsername
-      // again mid-flight since it's a mutable module-level variable
+      // Capture the cached value right now
       const cachedName = currentUsername;
 
-      // Show the cached username immediately (from localStorage) so the UI
-      // renders correctly before the network fetch completes
       const applyUsername = (u) => {
         const usernameEl = document.getElementById('accountUsername');
         const setupEl    = document.getElementById('usernameSetup');
         const changeEl   = document.getElementById('usernameChange');
-        const valid = u && u.trim().length > 0 && u !== '—' && u !== '-';
+        const valid = u && u.trim().length > 0;
         if (valid) {
           usernameEl.textContent = u;
           setupEl.style.display = 'none';
@@ -5413,21 +5410,20 @@
         }
       };
 
-      applyUsername(cachedName); // instant — from localStorage cache
+      // Show cached value immediately — this is the primary source of truth
+      applyUsername(cachedName);
 
-      // Refresh from Supabase in the background
-      try {
-        const fetched = await fetchProfile();
-        if (fetched) {
-          // Got a real value — update cache and display if different
-          if (fetched !== currentUsername) saveUsername(fetched);
-          applyUsername(fetched);
-        } else if (!fetched && !cachedName) {
-          // Neither DB nor cache has a username — show setup prompt
-          applyUsername(null);
-        }
-        // If fetch returned null but we have a cached name, keep showing it
-      } catch { /* network error — keep showing cached value */ }
+      // Only hit the network if we have no cached username.
+      // If we already have one, trust it — don't risk a failed fetch wiping it.
+      if (!cachedName) {
+        try {
+          const fetched = await fetchProfile();
+          if (fetched) {
+            saveUsername(fetched);
+            applyUsername(fetched);
+          }
+        } catch {}
+      }
 
     } else {
       signedOut.style.display = '';
