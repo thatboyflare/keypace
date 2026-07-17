@@ -4947,21 +4947,30 @@
     } catch { return false; }
   }
 
-  // Username cache — declared here so it's available before any updateAccountUI call
-  const USERNAME_KEY = 'keypace_username_v1';
+  // Username cache — keyed by user_id so multiple accounts on the same
+  // browser each get their own cache entry and don't bleed into each other.
+  const USERNAME_KEY_PREFIX = 'keypace_username_v2_';
   let currentUsername = null;
+
+  function usernameKey() {
+    return authSession ? USERNAME_KEY_PREFIX + authSession.user.id : null;
+  }
 
   function saveUsername(u) {
     currentUsername = u;
-    try { if (u) localStorage.setItem(USERNAME_KEY, u); else localStorage.removeItem(USERNAME_KEY); } catch {}
+    const key = usernameKey();
+    if (!key) return;
+    try { if (u) localStorage.setItem(key, u); else localStorage.removeItem(key); } catch {}
   }
 
   function loadUsername() {
-    try { return localStorage.getItem(USERNAME_KEY) || null; } catch { return null; }
+    const key = usernameKey();
+    if (!key) return null;
+    try { return localStorage.getItem(key) || null; } catch { return null; }
   }
 
-  // Load from localStorage immediately — available synchronously before any async code runs
-  currentUsername = loadUsername();
+  // currentUsername starts null — will be populated after session loads
+  // (can't load from cache here because authSession isn't set yet)
 
   // Make an authenticated fetch. On 401, refresh the token once and retry.
   // suppressClear: if true, don't call clearSession on failed refresh —
@@ -5104,6 +5113,7 @@
     const user = await userRes.json();
 
     saveSession({ access_token: accessToken, refresh_token: refreshToken, user });
+    currentUsername = loadUsername(); // load this user's cached username now that session is set
 
     // Fetch and cache the username right away — before updateAccountUI's
     // background fetch races with syncExistingBestsToLeaderboard
@@ -5208,6 +5218,7 @@
 
   // ── Init auth ─────────────────────────────────────────────────────────────
   loadSession();
+  currentUsername = loadUsername(); // now authSession is set so the key is user-specific
   updateAccountUI();
   handleAuthRedirect(); // handles the magic link click-through
 
@@ -5409,7 +5420,7 @@
       signedOut.style.display = '';
       signedIn.style.display = 'none';
       btn.classList.remove('account-active');
-      saveUsername(null); // clear cached username on sign-out
+      currentUsername = null; // clear in-memory value; per-user cache stays in localStorage
     }
   }
 
