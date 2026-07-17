@@ -5273,13 +5273,30 @@
 
   async function fetchProfile() {
     if (!authSession) return null;
-    const res = await authFetch(
-      `${PROFILES_URL}?user_id=eq.${authSession.user.id}&select=username`,
-      {}, true // suppressClear — passive load
-    );
-    if (!res.ok) return null;
-    const rows = await res.json();
-    return rows.length ? rows[0].username : null;
+    try {
+      const res = await authFetch(
+        `${PROFILES_URL}?user_id=eq.${authSession.user.id}&select=username`,
+        {}, true
+      );
+      if (!res.ok) return null;
+      const rows = await res.json();
+      return rows.length ? rows[0].username : null;
+    } catch {
+      // Try with raw token as fallback
+      try {
+        const res = await fetch(
+          `${PROFILES_URL}?user_id=eq.${authSession.user.id}&select=username`, {
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${authSession.access_token}`,
+            },
+          }
+        );
+        if (!res.ok) return null;
+        const rows = await res.json();
+        return rows.length ? rows[0].username : null;
+      } catch { return null; }
+    }
   }
 
   async function saveProfile(username) {
@@ -5394,16 +5411,16 @@
 
       applyUsername(currentUsername); // instant — from localStorage cache
 
-      // Then verify/refresh from Supabase in the background
+      // Always attempt a fresh fetch from Supabase to get the authoritative value
       try {
         const fetched = await fetchProfile();
-        // Only update if we got a real value — never replace a good cached
-        // name with null from a failed or empty fetch
         if (fetched && fetched !== currentUsername) {
           saveUsername(fetched);
           applyUsername(fetched);
+        } else if (!fetched && !currentUsername) {
+          // Confirmed no username in DB either — show setup
+          applyUsername(null);
         }
-        // If fetch returned null but we have a cached name, keep showing it
       } catch { /* network error — keep showing cached value */ }
 
     } else {
