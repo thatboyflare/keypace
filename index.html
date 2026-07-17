@@ -1578,7 +1578,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 26px;
+    margin-bottom: 16px;
   }
   .perf-title {
     font-family: var(--font-mono);
@@ -1588,7 +1588,132 @@
     letter-spacing: -0.01em;
   }
 
-  .perf-bests {
+  /* ── Perf tabs ─────────────────────────────────────────────────── */
+  .perf-tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .perf-tab {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-faint);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 14px;
+    margin-bottom: -1px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .perf-tab:hover { color: var(--ink-dim); }
+  .perf-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── Leaderboard mode nav ──────────────────────────────────────── */
+  .lb-mode-nav {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .lb-mode-btn {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-faint);
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .lb-mode-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .lb-mode-btn.active { color: var(--accent); border-color: var(--accent-dim); background: var(--accent-wash); }
+
+  /* ── Leaderboard board ─────────────────────────────────────────── */
+  .lb-board {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .lb-board-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    transition: background 0.12s;
+  }
+  .lb-board-row:hover { background: var(--bg-soft); }
+  .lb-board-row.lb-me {
+    background: var(--accent-wash);
+    border: 1px solid var(--accent-dim);
+  }
+  .lb-board-rank {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    width: 28px;
+    text-align: right;
+    flex-shrink: 0;
+    color: var(--ink-faint);
+  }
+  .lb-board-rank.gold   { color: #f5c542; }
+  .lb-board-rank.silver { color: #a8b8c8; }
+  .lb-board-rank.bronze { color: #cd7f32; }
+  .lb-board-name {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .lb-board-row.lb-me .lb-board-name { color: var(--accent); }
+  .lb-board-wpm {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    flex-shrink: 0;
+  }
+  .lb-board-wpm small {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--ink-faint);
+    margin-left: 1px;
+  }
+  .lb-board-acc {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ink-faint);
+    width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .lb-empty-state {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    color: var(--ink-faint);
+    text-align: center;
+    padding: 32px 0;
+  }
+  .lb-your-rank {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ink-faint);
+    text-align: center;
+    padding: 10px 0 4px;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+
+
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 10px;
@@ -2540,38 +2665,64 @@
       </button>
     </div>
 
-    <div class="perf-bests" id="perfBests"></div>
+    <!-- Tab bar -->
+    <div class="perf-tabs">
+      <button class="perf-tab active" data-tab="stats">my stats</button>
+      <button class="perf-tab" data-tab="leaderboard">leaderboard</button>
+    </div>
 
-    <div class="perf-section">
-      <div class="perf-section-head">
-        <span class="perf-section-title">wpm over time</span>
-        <div class="perf-filter" id="perfFilter">
-          <button data-filter="all" class="active">all</button>
-          <button data-filter="time:15">15s</button>
-          <button data-filter="time:30">30s</button>
-          <button data-filter="time:60">60s</button>
-          <button data-filter="words:25">25w</button>
-          <button data-filter="words:50">50w</button>
+    <!-- My stats tab -->
+    <div class="perf-tab-panel" id="perfTabStats">
+      <div class="perf-bests" id="perfBests"></div>
+
+      <div class="perf-section">
+        <div class="perf-section-head">
+          <span class="perf-section-title">wpm over time</span>
+          <div class="perf-filter" id="perfFilter">
+            <button data-filter="all" class="active">all</button>
+            <button data-filter="time:15">15s</button>
+            <button data-filter="time:30">30s</button>
+            <button data-filter="time:60">60s</button>
+            <button data-filter="words:25">25w</button>
+            <button data-filter="words:50">50w</button>
+          </div>
+        </div>
+        <div class="perf-chart-box">
+          <svg id="perfChartSvg" viewBox="0 0 900 220" preserveAspectRatio="none"></svg>
         </div>
       </div>
-      <div class="perf-chart-box">
-        <svg id="perfChartSvg" viewBox="0 0 900 220" preserveAspectRatio="none"></svg>
+
+      <div class="perf-section">
+        <div class="perf-section-head">
+          <span class="perf-section-title">test history</span>
+          <button class="btn-text" id="clearHistoryBtn">clear history</button>
+        </div>
+        <div class="perf-table-wrap">
+          <table class="perf-table" id="perfTable">
+            <thead>
+              <tr><th>date</th><th>mode</th><th>wpm</th><th>raw</th><th>acc</th><th>chars</th><th>time</th><th></th></tr>
+            </thead>
+            <tbody id="perfTableBody"></tbody>
+          </table>
+          <div class="perf-empty" id="perfEmpty">no tests yet — finish a test to see it here</div>
+        </div>
       </div>
     </div>
 
-    <div class="perf-section">
-      <div class="perf-section-head">
-        <span class="perf-section-title">test history</span>
-        <button class="btn-text" id="clearHistoryBtn">clear history</button>
+    <!-- Leaderboard tab -->
+    <div class="perf-tab-panel" id="perfTabLeaderboard" style="display:none">
+      <div class="lb-mode-nav" id="lbModeNav">
+        <button class="lb-mode-btn active" data-mode="time:15">15s</button>
+        <button class="lb-mode-btn" data-mode="time:30">30s</button>
+        <button class="lb-mode-btn" data-mode="time:60">60s</button>
+        <button class="lb-mode-btn" data-mode="words:25">25w</button>
+        <button class="lb-mode-btn" data-mode="words:50">50w</button>
       </div>
-      <div class="perf-table-wrap">
-        <table class="perf-table" id="perfTable">
-          <thead>
-            <tr><th>date</th><th>mode</th><th>wpm</th><th>raw</th><th>acc</th><th>chars</th><th>time</th><th></th></tr>
-          </thead>
-          <tbody id="perfTableBody"></tbody>
-        </table>
-        <div class="perf-empty" id="perfEmpty">no tests yet — finish a test to see it here</div>
+      <div class="lb-board" id="lbBoard">
+        <div class="lb-loading">loading…</div>
+      </div>
+      <div class="lb-signin-prompt" id="lbSigninPrompt" style="display:none">
+        Sign in and set a username to appear on the leaderboard.
       </div>
     </div>
   </div>
@@ -3468,9 +3619,14 @@
     if (isNewBest && wpm > 0) {
       bests[key] = { wpm, acc: accClamped, date: Date.now() };
       saveJSON(BESTS_KEY, bests);
-      // Save ghost timestamps so next run can race this best
       if (ghostTimestamps.length > 0) {
         saveGhost({ timestamps: ghostTimestamps, wpm, key, mode: state.mode, val: state.val });
+      }
+      // Submit to global leaderboard if signed in with a username
+      // Only for clean standard modes (no modifiers like punct/nums/code)
+      const cleanModes = ['time:15','time:30','time:60','words:25','words:50'];
+      if (authSession && currentUsername && cleanModes.includes(key)) {
+        submitLeaderboardScore(key, wpm, accClamped).catch(() => {});
       }
     }
     refreshBestBadge();
@@ -5039,6 +5195,7 @@
   // ---------------- profiles & username ----------------
   const PROFILES_URL     = `${SUPABASE_URL}/rest/v1/profiles`;
   const DAILY_SCORES_URL = `${SUPABASE_URL}/rest/v1/daily_scores`;
+  const LEADERBOARD_URL  = `${SUPABASE_URL}/rest/v1/leaderboard`;
 
   let currentUsername = null; // cached after fetch
 
@@ -6979,6 +7136,110 @@ Rules:
 
 
 
+
+  // ---------------- all-time leaderboard ----------------
+
+  const LB_MODE_LABELS = {
+    'time:15':  '15s', 'time:30':  '30s', 'time:60':  '60s',
+    'words:25': '25w', 'words:50': '50w',
+  };
+  let lbCurrentMode = 'time:15';
+
+  async function submitLeaderboardScore(modeKey, wpm, acc) {
+    if (!authSession) return;
+    const res = await authFetch(LEADERBOARD_URL, {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({
+        user_id:     authSession.user.id,
+        mode_key:    modeKey,
+        wpm,
+        acc,
+        achieved_at: new Date().toISOString(),
+      }),
+    });
+    if (!res.ok) console.warn('Leaderboard submit failed:', res.status);
+  }
+
+  async function fetchLeaderboardScores(modeKey) {
+    // Join with profiles to get display names
+    const url = `${LEADERBOARD_URL}?mode_key=eq.${encodeURIComponent(modeKey)}&select=wpm,acc,user_id,profiles(username)&order=wpm.desc&limit=50`;
+    const res = await fetch(url, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  function renderLeaderboardTab(rows, modeKey) {
+    const board = document.getElementById('lbBoard');
+    const myId  = authSession?.user?.id;
+
+    if (!rows || !rows.length) {
+      board.innerHTML = `<div class="lb-empty-state">No scores yet for ${LB_MODE_LABELS[modeKey] || modeKey}.<br>Be the first — set a personal best to appear here.</div>`;
+      return;
+    }
+
+    let myRank = null;
+    const html = rows.map((row, i) => {
+      const username = row.profiles?.username || 'anonymous';
+      const isMe     = myId && row.user_id === myId;
+      if (isMe) myRank = i + 1;
+      const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+      const rankSymbol = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+      return `<div class="lb-board-row ${isMe ? 'lb-me' : ''}">
+        <span class="lb-board-rank ${rankClass}">${rankSymbol}</span>
+        <span class="lb-board-name">${escHtml(username)}${isMe ? ' <span style="font-size:10px;opacity:.6">(you)</span>' : ''}</span>
+        <span class="lb-board-wpm">${row.wpm}<small>wpm</small></span>
+        <span class="lb-board-acc">${row.acc}%</span>
+      </div>`;
+    }).join('');
+
+    board.innerHTML = html;
+
+    // If signed in but not in top 50, show their rank separately
+    if (myId && !myRank) {
+      const yourRow = document.createElement('div');
+      yourRow.className = 'lb-your-rank';
+      yourRow.textContent = authSession && currentUsername
+        ? `Your score for ${LB_MODE_LABELS[modeKey] || modeKey} hasn't been submitted yet — set a new personal best to appear here.`
+        : 'Sign in and set a username to appear on the leaderboard.';
+      board.appendChild(yourRow);
+    }
+  }
+
+  async function loadLeaderboardTab(modeKey) {
+    const board = document.getElementById('lbBoard');
+    board.innerHTML = '<div class="lb-loading">loading…</div>';
+    try {
+      const rows = await fetchLeaderboardScores(modeKey);
+      renderLeaderboardTab(rows, modeKey);
+    } catch (e) {
+      board.innerHTML = '<div class="lb-empty-state">Could not load scores. Check your connection.</div>';
+    }
+  }
+
+  // Tab switching
+  document.querySelectorAll('.perf-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.perf-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      document.getElementById('perfTabStats').style.display        = tab === 'stats'       ? '' : 'none';
+      document.getElementById('perfTabLeaderboard').style.display  = tab === 'leaderboard' ? '' : 'none';
+      if (tab === 'leaderboard') loadLeaderboardTab(lbCurrentMode);
+    });
+  });
+
+  // Mode selector inside leaderboard tab
+  document.getElementById('lbModeNav').addEventListener('click', (e) => {
+    const btn = e.target.closest('.lb-mode-btn');
+    if (!btn) return;
+    document.querySelectorAll('.lb-mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    lbCurrentMode = btn.dataset.mode;
+    loadLeaderboardTab(lbCurrentMode);
+  });
 
   // ---------------- privacy modal ----------------
   document.getElementById('privacyBtn').addEventListener('click', () => {
