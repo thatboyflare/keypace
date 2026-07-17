@@ -2089,8 +2089,8 @@
     position: fixed;
     inset: 0;
     z-index: 80;
-    background: rgba(10, 11, 18, 0.88);
-    backdrop-filter: blur(8px);
+    background: rgba(10, 11, 18, 0.92);
+    backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2105,24 +2105,118 @@
     background: var(--bg-soft);
     border: 1px solid var(--border);
     border-radius: 20px;
-    padding: 40px 36px;
-    max-width: 420px;
+    padding: 36px 36px 30px;
+    max-width: 520px;
     width: 100%;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 18px;
-    text-align: center;
+    gap: 20px;
     box-shadow: 0 24px 64px rgba(0,0,0,0.5);
     animation: rise 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  .hint-logo { font-family: var(--font-mono); font-size: 28px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
-  .hint-headline { font-family: var(--font-ui); font-size: 15px; color: var(--ink-dim); margin-top: -8px; }
-  .hint-steps { display: flex; flex-direction: column; gap: 10px; width: 100%; margin: 4px 0; }
-  .hint-step { display: flex; align-items: center; gap: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; text-align: left; font-family: var(--font-ui); font-size: 13px; color: var(--ink-dim); }
-  .hint-step-icon { font-size: 18px; flex-shrink: 0; }
+
+  /* top row: logo + tagline */
+  .hint-top {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .hint-logo { font-family: var(--font-mono); font-size: 24px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+  .hint-tagline { font-family: var(--font-ui); font-size: 13px; color: var(--ink-faint); }
+
+  /* sample coach report */
+  .hint-report {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .hint-report-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .hint-report-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .hint-report-headline {
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.4;
+  }
+  .hint-report-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .hint-report-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .hint-report-row-title {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-dim);
+  }
+  .hint-report-row-body {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink-faint);
+    line-height: 1.5;
+  }
+  .hint-drill {
+    background: var(--bg-soft);
+    border: 1px solid var(--accent-dim);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .hint-drill-text {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink-dim);
+  }
+  .hint-drill-text strong { color: var(--accent); }
+  .hint-drill-badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    border-radius: 4px;
+    padding: 2px 7px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* actions */
+  .hint-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
   .hint-start-btn { width: 100%; justify-content: center; padding: 13px; font-size: 14px; }
-  .hint-skip { font-family: var(--font-ui); font-size: 11px; color: var(--ink-faint); }
+  .hint-skip { font-family: var(--font-ui); font-size: 11px; color: var(--ink-faint); text-align: center; }
 
   /* Focus mode — dims surrounding UI while actively typing so
      attention stays solely on the words. */
@@ -2702,7 +2796,7 @@
   </main>
 
   <footer>
-    <div>made by <span class="credit">Saim Abbasi</span> · <button class="btn-text footer-link" id="privacyBtn" style="font-size:11px;color:var(--ink-faint);">privacy & AI info</button></div>
+    <div>made by <span class="credit">Saim Abbasi</span> · <a href="/privacy.html" style="font-size:11px;color:var(--ink-faint);text-decoration:none;" id="privacyBtn">privacy & terms</a></div>
     <div class="keys">
       <span><kbd>tab</kbd> restart</span>
       <span><kbd>esc</kbd> stop</span>
@@ -2820,62 +2914,36 @@
   </div>
 </div>
 
-<!-- Privacy & AI transparency modal -->
-<div class="share-modal" id="privacyModal">
-  <div class="share-modal-panel" style="max-width:540px;">
-    <div class="share-modal-header">
-      <span class="share-modal-title">privacy & ai info</span>
-      <button class="icon-btn" id="privacyModalCloseBtn" aria-label="Close">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-      </button>
-    </div>
-    <div class="privacy-body">
-
-      <div class="privacy-section">
-        <div class="privacy-section-title">what keypace analyzes</div>
-        <p>all typing analysis — wpm, accuracy, inter-key intervals, character error rates, bigram timing, hesitation patterns, and speed decay — is calculated locally in your browser. this data never leaves your device during analysis.</p>
-      </div>
-
-      <div class="privacy-section">
-        <div class="privacy-section-title">what is sent to the ai coach</div>
-        <p>after a test, a structured summary of your diagnostic metrics is sent to anthropic's claude api via a secure cloudflare worker. for example: <span class="privacy-mono">accuracy: 94%, slowest bigram: 'th' at 320ms</span>.</p>
-        <p class="privacy-highlight">your raw keystrokes, the text you typed, your email address, and your display name are never sent to anthropic.</p>
-      </div>
-
-      <div class="privacy-section">
-        <div class="privacy-section-title">data storage</div>
-        <p>test history and personal bests are stored locally in your browser's localStorage. if you sign in, your history and bests are also stored in a supabase database associated with your account. raw keystroke timestamps from your most recent tests are kept locally for replay and are not uploaded.</p>
-      </div>
-
-      <div class="privacy-section">
-        <div class="privacy-section-title">ai coaching limitations</div>
-        <p>ai coaching insights are generated by a language model and may occasionally be imprecise. keypace does not provide medical, ergonomic, or physical therapy advice. coaching is educational guidance only.</p>
-      </div>
-
-      <div class="privacy-section">
-        <div class="privacy-section-title">deleting your data</div>
-        <p>to clear local data, clear your browser's site data for keypace.io in your browser settings.</p>
-        <p>to delete your account and all cloud data permanently, email <a href="mailto:contact@keypace.io" class="privacy-link">contact@keypace.io</a> with the subject "account deletion request". signing out does not delete your account or data.</p>
-      </div>
-
-      <div class="privacy-footer">last updated july 2026 · <a href="https://keypace.io" class="privacy-link">keypace.io</a></div>
-
-    </div>
-  </div>
-</div>
-
 <!-- First-visit hint -->
 <div class="hint-overlay" id="hintOverlay">
   <div class="hint-card">
-    <div class="hint-logo"><span>keypace</span><span class="dot">_</span></div>
-    <div class="hint-headline">your AI-powered typing coach</div>
-    <div class="hint-steps">
-      <div class="hint-step"><span class="hint-step-icon">⌨️</span><span>just start typing to begin a test</span></div>
-      <div class="hint-step"><span class="hint-step-icon">🤖</span><span>get AI coaching after each test</span></div>
-      <div class="hint-step"><span class="hint-step-icon">📈</span><span>track your progress over time</span></div>
+
+    <div class="hint-top">
+      <div class="hint-logo"><span>keypace</span><span class="dot">_</span></div>
+      <div class="hint-tagline">every typing test should teach you something.</div>
     </div>
-    <button class="btn primary hint-start-btn" id="hintStartBtn">start typing →</button>
-    <div class="hint-skip">already know the drill? just start typing</div>
+
+    <!-- Sample coach report — looks exactly like a real one -->
+    <div class="hint-report">
+      <div class="hint-report-label">sample coach insight</div>
+      <div class="hint-report-headline">your speed is strong, but punctuation is costing you 14 wpm</div>
+      <div class="hint-report-rows">
+        <div class="hint-report-row">
+          <div class="hint-report-row-title">finding</div>
+          <div class="hint-report-row-body">punctuation accuracy was 81% — you hesitated most after quotation marks and before capital letters. average delay: 610ms vs your 290ms baseline.</div>
+        </div>
+      </div>
+      <div class="hint-drill">
+        <div class="hint-drill-text"><strong>recommended drill</strong> — punctuation rhythm · 30s · hit 90%+ accuracy</div>
+        <div class="hint-drill-badge">personalized</div>
+      </div>
+    </div>
+
+    <div class="hint-actions">
+      <button class="btn primary hint-start-btn" id="hintStartBtn">start typing →</button>
+      <div class="hint-skip">keypace analyzes your real typing — this is just an example</div>
+    </div>
+
   </div>
 </div>
 
@@ -7421,18 +7489,6 @@ Rules:
     btn.classList.add('active');
     lbCurrentMode = btn.dataset.mode;
     loadLeaderboardTab(lbCurrentMode);
-  });
-
-  // ---------------- privacy modal ----------------
-  document.getElementById('privacyBtn').addEventListener('click', () => {
-    document.getElementById('privacyModal').classList.add('show');
-  });
-  document.getElementById('privacyModalCloseBtn').addEventListener('click', () => {
-    document.getElementById('privacyModal').classList.remove('show');
-  });
-  document.getElementById('privacyModal').addEventListener('click', (e) => {
-    if (e.target === document.getElementById('privacyModal'))
-      document.getElementById('privacyModal').classList.remove('show');
   });
 
   // ---------------- first-visit hint ----------------
