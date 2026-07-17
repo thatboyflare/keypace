@@ -5249,7 +5249,20 @@
   const DAILY_SCORES_URL = `${SUPABASE_URL}/rest/v1/daily_scores`;
   const LEADERBOARD_URL  = `${SUPABASE_URL}/rest/v1/leaderboard`;
 
-  let currentUsername = null; // cached after fetch
+  const USERNAME_KEY = 'keypace_username_v1';
+  let currentUsername = null;
+
+  function saveUsername(u) {
+    currentUsername = u;
+    try { if (u) localStorage.setItem(USERNAME_KEY, u); else localStorage.removeItem(USERNAME_KEY); } catch {}
+  }
+
+  function loadUsername() {
+    try { return localStorage.getItem(USERNAME_KEY) || null; } catch { return null; }
+  }
+
+  // Load from cache immediately so the UI shows the name before the network fetch
+  currentUsername = loadUsername();
 
   async function fetchProfile() {
     if (!authSession) return null;
@@ -5354,29 +5367,39 @@
       document.getElementById('accountSyncStatus').textContent = 'Signed in — stats sync automatically.';
       btn.classList.add('account-active');
 
-      // Load username
+      // Show the cached username immediately (from localStorage) so the UI
+      // renders correctly before the network fetch completes
+      const applyUsername = (u) => {
+        const usernameEl = document.getElementById('accountUsername');
+        const setupEl    = document.getElementById('usernameSetup');
+        const changeEl   = document.getElementById('usernameChange');
+        if (u) {
+          usernameEl.textContent = u;
+          setupEl.style.display = 'none';
+          changeEl.style.display = '';
+        } else {
+          usernameEl.textContent = 'no username set';
+          setupEl.style.display = '';
+          changeEl.style.display = 'none';
+        }
+      };
+
+      applyUsername(currentUsername); // instant — from localStorage cache
+
+      // Then verify/refresh from Supabase in the background
       try {
-        currentUsername = await fetchProfile();
-      } catch { currentUsername = null; }
+        const fetched = await fetchProfile();
+        if (fetched !== currentUsername) {
+          saveUsername(fetched); // update cache if it changed
+          applyUsername(fetched);
+        }
+      } catch { /* network error — keep showing cached value */ }
 
-      const usernameEl = document.getElementById('accountUsername');
-      const setupEl    = document.getElementById('usernameSetup');
-      const changeEl   = document.getElementById('usernameChange');
-
-      if (currentUsername) {
-        usernameEl.textContent = currentUsername;
-        setupEl.style.display = 'none';
-        changeEl.style.display = '';
-      } else {
-        usernameEl.textContent = 'no username set';
-        setupEl.style.display = '';
-        changeEl.style.display = 'none';
-      }
     } else {
       signedOut.style.display = '';
       signedIn.style.display = 'none';
       btn.classList.remove('account-active');
-      currentUsername = null;
+      saveUsername(null); // clear cached username on sign-out
     }
   }
 
@@ -5397,13 +5420,12 @@
 
     try {
       await saveProfile(username);
-      currentUsername = username;
+      saveUsername(username); // persist to localStorage cache
       document.getElementById('accountUsername').textContent = username;
       document.getElementById('usernameSetup').style.display = 'none';
       document.getElementById('usernameChange').style.display = '';
       result.textContent = '';
       result.className = 'sync-result';
-      // Now that username is set, sync existing PBs to leaderboard
       syncExistingBestsToLeaderboard().catch(() => {});
     } catch (e) {
       const msg = e.message?.includes('duplicate') || e.message?.includes('unique')
