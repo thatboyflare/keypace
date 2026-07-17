@@ -5114,7 +5114,7 @@
     // background fetch races with syncExistingBestsToLeaderboard
     try {
       const fetched = await fetchProfile();
-      if (fetched) saveUsername(fetched);
+      if (fetched) saveUsername(fetched); // only cache if we got a real value
     } catch {}
 
     updateAccountUI();
@@ -5396,10 +5396,13 @@
       // Then verify/refresh from Supabase in the background
       try {
         const fetched = await fetchProfile();
-        if (fetched !== currentUsername) {
-          saveUsername(fetched); // update cache if it changed
+        // Only update if we got a real value — never replace a good cached
+        // name with null from a failed or empty fetch
+        if (fetched && fetched !== currentUsername) {
+          saveUsername(fetched);
           applyUsername(fetched);
         }
+        // If fetch returned null but we have a cached name, keep showing it
       } catch { /* network error — keep showing cached value */ }
 
     } else {
