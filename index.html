@@ -5380,7 +5380,8 @@
         const usernameEl = document.getElementById('accountUsername');
         const setupEl    = document.getElementById('usernameSetup');
         const changeEl   = document.getElementById('usernameChange');
-        if (u) {
+        const valid = u && u.trim().length > 0 && u !== '—' && u !== '-';
+        if (valid) {
           usernameEl.textContent = u;
           setupEl.style.display = 'none';
           changeEl.style.display = '';
