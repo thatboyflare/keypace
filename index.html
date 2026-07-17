@@ -4947,6 +4947,22 @@
     } catch { return false; }
   }
 
+  // Username cache — declared here so it's available before any updateAccountUI call
+  const USERNAME_KEY = 'keypace_username_v1';
+  let currentUsername = null;
+
+  function saveUsername(u) {
+    currentUsername = u;
+    try { if (u) localStorage.setItem(USERNAME_KEY, u); else localStorage.removeItem(USERNAME_KEY); } catch {}
+  }
+
+  function loadUsername() {
+    try { return localStorage.getItem(USERNAME_KEY) || null; } catch { return null; }
+  }
+
+  // Load from localStorage immediately — available synchronously before any async code runs
+  currentUsername = loadUsername();
+
   // Make an authenticated fetch. On 401, refresh the token once and retry.
   // suppressClear: if true, don't call clearSession on failed refresh —
   // used for background syncs on page load so a network blip doesn't
@@ -5063,27 +5079,6 @@
       refreshBestBadge();
     }
     return true;
-  }
-
-  // Update the account panel UI
-  function updateAccountUI() {
-    const signedOut = document.getElementById('accountSignedOut');
-    const signedIn  = document.getElementById('accountSignedIn');
-    const btn = document.getElementById('accountBtn');
-
-    if (authSession) {
-      signedOut.style.display = 'none';
-      signedIn.style.display = '';
-      const email = authSession.user.email || '';
-      document.getElementById('accountEmail2').textContent = email;
-      document.getElementById('accountAvatar').textContent = email.charAt(0).toUpperCase();
-      document.getElementById('accountSyncStatus').textContent = 'Signed in — stats sync automatically.';
-      btn.classList.add('account-active');
-    } else {
-      signedOut.style.display = '';
-      signedIn.style.display = 'none';
-      btn.classList.remove('account-active');
-    }
   }
 
   // Handle magic link redirect — Supabase appends #access_token=... to the URL
@@ -5255,21 +5250,6 @@
   const PROFILES_URL     = `${SUPABASE_URL}/rest/v1/profiles`;
   const DAILY_SCORES_URL = `${SUPABASE_URL}/rest/v1/daily_scores`;
   const LEADERBOARD_URL  = `${SUPABASE_URL}/rest/v1/leaderboard`;
-
-  const USERNAME_KEY = 'keypace_username_v1';
-  let currentUsername = null;
-
-  function saveUsername(u) {
-    currentUsername = u;
-    try { if (u) localStorage.setItem(USERNAME_KEY, u); else localStorage.removeItem(USERNAME_KEY); } catch {}
-  }
-
-  function loadUsername() {
-    try { return localStorage.getItem(USERNAME_KEY) || null; } catch { return null; }
-  }
-
-  // Load from cache immediately so the UI shows the name before the network fetch
-  currentUsername = loadUsername();
 
   async function fetchProfile() {
     if (!authSession) return null;
