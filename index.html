@@ -5391,6 +5391,10 @@
       document.getElementById('accountSyncStatus').textContent = 'Signed in — stats sync automatically.';
       btn.classList.add('account-active');
 
+      // Capture the cached value right now — don't read currentUsername
+      // again mid-flight since it's a mutable module-level variable
+      const cachedName = currentUsername;
+
       // Show the cached username immediately (from localStorage) so the UI
       // renders correctly before the network fetch completes
       const applyUsername = (u) => {
@@ -5409,18 +5413,20 @@
         }
       };
 
-      applyUsername(currentUsername); // instant — from localStorage cache
+      applyUsername(cachedName); // instant — from localStorage cache
 
-      // Always attempt a fresh fetch from Supabase to get the authoritative value
+      // Refresh from Supabase in the background
       try {
         const fetched = await fetchProfile();
-        if (fetched && fetched !== currentUsername) {
-          saveUsername(fetched);
+        if (fetched) {
+          // Got a real value — update cache and display if different
+          if (fetched !== currentUsername) saveUsername(fetched);
           applyUsername(fetched);
-        } else if (!fetched && !currentUsername) {
-          // Confirmed no username in DB either — show setup
+        } else if (!fetched && !cachedName) {
+          // Neither DB nor cache has a username — show setup prompt
           applyUsername(null);
         }
+        // If fetch returned null but we have a cached name, keep showing it
       } catch { /* network error — keep showing cached value */ }
 
     } else {
