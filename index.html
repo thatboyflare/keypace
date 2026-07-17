@@ -3394,6 +3394,7 @@
     if (state.running || state.finished) return;
     state.running = true;
     state.startTime = performance.now();
+    _lastSampleMs = state.startTime;
     document.body.classList.add('is-typing');
     if (state.mode === 'time') {
       timerEl.classList.add('show');
@@ -3418,6 +3419,19 @@
     const raw = Math.round((state.keystrokes / 5) / elapsedMin);
     state.wpmHistory.push({ t: state.wpmHistory.length + 1, wpm: Math.max(0, wpm), raw: Math.max(0, raw) });
     liveWpmVal.textContent = Math.max(0, wpm);
+  }
+
+  // For non-time modes, sample WPM once per second via keypress timing.
+  // Time mode is handled by tick(); this covers word/daily/drill/retest.
+  let _lastSampleMs = 0;
+  function maybeSampleWpm() {
+    if (state.mode === 'time') return; // tick() handles this
+    if (!state.running || !state.startTime) return;
+    const now = performance.now();
+    if (now - _lastSampleMs >= 1000) {
+      _lastSampleMs = now;
+      recordWpmSample();
+    }
   }
 
   function applyTypedChar(i, ch, isCorrect) {
@@ -3519,6 +3533,7 @@
     applyTypedChar(i, e.key, isCorrect);
     updateCaret(false);
     playKeySound(isCorrect ? 'key' : 'error');
+    maybeSampleWpm(); // populate wpmHistory for non-time modes so the chart renders
 
     if ((state.mode === 'words' || state.mode === 'daily' || state.mode === '_drill' || state.mode === '_retest') && state.typed.length >= state.text.length) {
       finishTest();
@@ -4933,8 +4948,10 @@
   }
 
   // Make an authenticated fetch. On 401, refresh the token once and retry.
-  // This is the only auth wrapper needed — no pre-flight checks.
-  async function authFetch(url, options = {}) {
+  // suppressClear: if true, don't call clearSession on failed refresh —
+  // used for background syncs on page load so a network blip doesn't
+  // log the user out silently.
+  async function authFetch(url, options = {}, suppressClear = false) {
     const makeRequest = () => fetch(url, {
       ...options,
       headers: { ...authHeaders(), ...(options.headers || {}) },
@@ -4943,14 +4960,15 @@
     let res = await makeRequest();
 
     if (res.status === 401) {
-      // Token expired — try refreshing once
       const refreshed = await tryRefreshSession();
       if (!refreshed) {
-        clearSession();
-        updateAccountUI();
+        if (!suppressClear) {
+          clearSession();
+          updateAccountUI();
+        }
         throw new Error('Your session has expired. Please sign in again.');
       }
-      res = await makeRequest(); // retry with fresh token
+      res = await makeRequest();
     }
 
     return res;
@@ -5010,17 +5028,19 @@
       method: 'POST',
       headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(payload),
-    });
+    }, true); // suppressClear — don't log out on network blip
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
       throw new Error(`Push failed (${res.status}): ${txt}`);
     }
   }
 
-  // Pull stats from Supabase and merge into local
   async function pullStats() {
     if (!authSession) return false;
-    const res = await authFetch(`${STATS_URL}?user_id=eq.${authSession.user.id}&select=bests,history`);
+    const res = await authFetch(
+      `${STATS_URL}?user_id=eq.${authSession.user.id}&select=bests,history`,
+      {}, true // suppressClear
+    );
     if (!res.ok) throw new Error(`Pull failed (${res.status})`);
     const rows = await res.json();
     if (!rows.length) return false;
@@ -5096,7 +5116,9 @@
     try {
       status.textContent = 'Syncing stats…';
       await pullStats();
-      await pushStats(); // also push any local data we have
+      await pushStats();
+      // Sync existing PBs to leaderboard — needs username to be loaded first
+      await syncExistingBestsToLeaderboard();
       status.textContent = 'Signed in — stats sync automatically.';
       status.className = 'sync-result show success';
     } catch (e) {
@@ -5187,9 +5209,39 @@
   updateAccountUI();
   handleAuthRedirect(); // handles the magic link click-through
 
+  // Sync all existing clean-mode personal bests to the leaderboard.
+  // Called on page load (if signed in) and after magic link sign-in.
+  // Uses upsert so it's safe to call multiple times — only updates if
+  // the score in the leaderboard table is lower than the local best.
+  const CLEAN_MODES = ['time:15','time:30','time:60','words:25','words:50'];
+
+  async function syncExistingBestsToLeaderboard() {
+    if (!authSession || !currentUsername) return;
+    const entries = CLEAN_MODES
+      .filter(key => bests[key] && bests[key].wpm > 0)
+      .map(key => ({
+        user_id:     authSession.user.id,
+        mode_key:    key,
+        wpm:         bests[key].wpm,
+        acc:         bests[key].acc,
+        achieved_at: new Date(bests[key].date || Date.now()).toISOString(),
+      }));
+    if (!entries.length) return;
+
+    // Batch upsert — Supabase accepts an array
+    await authFetch(LEADERBOARD_URL, {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(entries),
+    }, true); // suppressClear — background sync, don't log out on failure
+  }
+
   // Auto-sync on page load if already signed in
   if (authSession) {
-    pullStats().then(() => pushStats()).catch(() => {});
+    pullStats().then(async () => {
+      await pushStats();
+      await syncExistingBestsToLeaderboard();
+    }).catch(() => {});
   }
 
   // ---------------- profiles & username ----------------
@@ -5201,7 +5253,10 @@
 
   async function fetchProfile() {
     if (!authSession) return null;
-    const res = await authFetch(`${PROFILES_URL}?user_id=eq.${authSession.user.id}&select=username`);
+    const res = await authFetch(
+      `${PROFILES_URL}?user_id=eq.${authSession.user.id}&select=username`,
+      {}, true // suppressClear — passive load
+    );
     if (!res.ok) return null;
     const rows = await res.json();
     return rows.length ? rows[0].username : null;
@@ -5348,6 +5403,8 @@
       document.getElementById('usernameChange').style.display = '';
       result.textContent = '';
       result.className = 'sync-result';
+      // Now that username is set, sync existing PBs to leaderboard
+      syncExistingBestsToLeaderboard().catch(() => {});
     } catch (e) {
       const msg = e.message?.includes('duplicate') || e.message?.includes('unique')
         ? 'That username is already taken — try another.'
