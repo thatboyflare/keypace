@@ -5451,16 +5451,25 @@
   }
 
   async function fetchLeaderboard(date) {
-    // Join daily_scores with profiles to get username
-    const url = `${DAILY_SCORES_URL}?date=eq.${date}&select=wpm,acc,user_id,profiles(username)&order=wpm.desc&limit=20`;
-    const res = await fetch(url, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-      },
-    });
-    if (!res.ok) return null;
-    return res.json();
+    // Step 1: fetch scores for today
+    const scoresRes = await fetch(
+      `${DAILY_SCORES_URL}?date=eq.${date}&select=wpm,acc,user_id&order=wpm.desc&limit=20`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    if (!scoresRes.ok) return null;
+    const scores = await scoresRes.json();
+    if (!scores.length) return [];
+
+    // Step 2: fetch usernames separately (join syntax not reliable without FK)
+    const ids = scores.map(s => s.user_id).filter(Boolean);
+    const profilesRes = await fetch(
+      `${PROFILES_URL}?user_id=in.(${ids.join(',')})&select=user_id,username`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    const profiles = profilesRes.ok ? await profilesRes.json() : [];
+    const profileMap = {};
+    profiles.forEach(p => { profileMap[p.user_id] = p.username; });
+    return scores.map(s => ({ ...s, username: profileMap[s.user_id] || null }));
   }
 
   function renderLeaderboard(rows, myUserId, date) {
@@ -5480,21 +5489,20 @@
     }
 
     list.innerHTML = rows.map((row, i) => {
-      const username = row.profiles?.username || 'anonymous';
+      const username = row.username || 'anonymous';
       const isMe = myUserId && row.user_id === myUserId;
       const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
       const rankSymbol = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`;
       return `
         <div class="lb-row ${isMe ? 'lb-me' : ''}">
           <span class="lb-rank ${rankClass}">${rankSymbol}</span>
-          <span class="lb-name">${username}${isMe ? ' (you)' : ''}</span>
+          <span class="lb-name">${escHtml(username)}${isMe ? ' (you)' : ''}</span>
           <span class="lb-wpm">${row.wpm}<small>wpm</small></span>
           <span class="lb-acc">${row.acc}%</span>
         </div>
       `;
     }).join('');
 
-    // If signed in but not on leaderboard yet, show a prompt
     if (authSession && !rows.find(r => r.user_id === myUserId)) {
       list.innerHTML += '<div class="lb-signin-prompt">Finish the daily challenge to appear on the leaderboard.</div>';
     } else if (!authSession) {
