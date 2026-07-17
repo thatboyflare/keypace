@@ -2865,6 +2865,8 @@
         <button class="lb-mode-btn" data-mode="time:60">60s</button>
         <button class="lb-mode-btn" data-mode="words:25">25w</button>
         <button class="lb-mode-btn" data-mode="words:50">50w</button>
+        <span style="width:1px;background:var(--border);margin:0 4px;align-self:stretch;display:inline-block;"></span>
+        <button class="lb-mode-btn" data-mode="daily">daily 🔥</button>
       </div>
       <div class="lb-board" id="lbBoard">
         <div class="lb-loading">loading…</div>
@@ -7470,10 +7472,48 @@ Rules:
     const board = document.getElementById('lbBoard');
     board.innerHTML = '<div class="lb-loading">loading…</div>';
     try {
-      const rows = await fetchLeaderboardScores(modeKey);
-      renderLeaderboardTab(rows, modeKey);
+      if (modeKey === 'daily') {
+        // Fetch today's daily scores
+        const today = getDailyDateStr();
+        const rows  = await fetchLeaderboard(today);
+        renderDailyLeaderboardInTab(rows || [], today);
+      } else {
+        const rows = await fetchLeaderboardScores(modeKey);
+        renderLeaderboardTab(rows, modeKey);
+      }
     } catch (e) {
-      board.innerHTML = '<div class="lb-empty-state">Could not load scores. Check your connection.</div>';
+      board.innerHTML = '<div class="lb-empty-state">could not load scores. check your connection.</div>';
+    }
+  }
+
+  function renderDailyLeaderboardInTab(rows, date) {
+    const board  = document.getElementById('lbBoard');
+    const myId   = authSession?.user?.id;
+    const label  = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    if (!rows.length) {
+      board.innerHTML = `<div class="lb-empty-state">no scores yet for daily ${label}.<br>complete today's challenge to be the first!</div>`;
+      return;
+    }
+
+    let myRank = null;
+    board.innerHTML = `<div class="lb-your-rank" style="text-align:left;border:none;padding:0 0 10px;font-size:12px;color:var(--ink-faint);">daily challenge · ${label}</div>` +
+      rows.map((row, i) => {
+        const username   = row.username || 'anonymous';
+        const isMe       = myId && row.user_id === myId;
+        if (isMe) myRank = i + 1;
+        const rankClass  = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+        const rankSymbol = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+        return `<div class="lb-board-row ${isMe ? 'lb-me' : ''}">
+          <span class="lb-board-rank ${rankClass}">${rankSymbol}</span>
+          <span class="lb-board-name">${escHtml(username)}${isMe ? ' <span style="font-size:10px;opacity:.6">(you)</span>' : ''}</span>
+          <span class="lb-board-wpm">${row.wpm}<small>wpm</small></span>
+          <span class="lb-board-acc">${row.acc}%</span>
+        </div>`;
+      }).join('');
+
+    if (myId && !myRank) {
+      board.innerHTML += `<div class="lb-your-rank">complete today's daily challenge to appear here.</div>`;
     }
   }
 
