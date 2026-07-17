@@ -7162,13 +7162,27 @@ Rules:
   }
 
   async function fetchLeaderboardScores(modeKey) {
-    // Join with profiles to get display names
-    const url = `${LEADERBOARD_URL}?mode_key=eq.${encodeURIComponent(modeKey)}&select=wpm,acc,user_id,profiles(username)&order=wpm.desc&limit=50`;
-    const res = await fetch(url, {
+    // Step 1: fetch scores for this mode
+    const scoresUrl = `${LEADERBOARD_URL}?mode_key=eq.${encodeURIComponent(modeKey)}&select=wpm,acc,user_id&order=wpm.desc&limit=50`;
+    const scoresRes = await fetch(scoresUrl, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+    if (!scoresRes.ok) throw new Error(`Scores HTTP ${scoresRes.status}`);
+    const scores = await scoresRes.json();
+    if (!scores.length) return [];
+
+    // Step 2: fetch usernames for those user_ids
+    const ids = scores.map(s => s.user_id).filter(Boolean);
+    const profilesUrl = `${PROFILES_URL}?user_id=in.(${ids.join(',')})&select=user_id,username`;
+    const profilesRes = await fetch(profilesUrl, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+    });
+    const profiles = profilesRes.ok ? await profilesRes.json() : [];
+
+    // Merge username into each score row
+    const profileMap = {};
+    profiles.forEach(p => { profileMap[p.user_id] = p.username; });
+    return scores.map(s => ({ ...s, username: profileMap[s.user_id] || null }));
   }
 
   function renderLeaderboardTab(rows, modeKey) {
@@ -7182,7 +7196,7 @@ Rules:
 
     let myRank = null;
     const html = rows.map((row, i) => {
-      const username = row.profiles?.username || 'anonymous';
+      const username = row.username || 'anonymous';
       const isMe     = myId && row.user_id === myId;
       if (isMe) myRank = i + 1;
       const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
