@@ -5109,15 +5109,22 @@
     const user = await userRes.json();
 
     saveSession({ access_token: accessToken, refresh_token: refreshToken, user });
+
+    // Fetch and cache the username right away — before updateAccountUI's
+    // background fetch races with syncExistingBestsToLeaderboard
+    try {
+      const fetched = await fetchProfile();
+      if (fetched) saveUsername(fetched);
+    } catch {}
+
     updateAccountUI();
 
-    // Pull remote stats on first sign-in
+    // Pull remote stats
     const status = document.getElementById('accountSyncStatus');
     try {
       status.textContent = 'Syncing stats…';
       await pullStats();
       await pushStats();
-      // Sync existing PBs to leaderboard — needs username to be loaded first
       await syncExistingBestsToLeaderboard();
       status.textContent = 'Signed in — stats sync automatically.';
       status.className = 'sync-result show success';
