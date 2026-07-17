@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en" data-theme="dusk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1b26'/><text x='4' y='22' font-family='monospace' font-size='18' font-weight='700' fill='%23e8b339'>k_</text></svg>" />
+<title>privacy & terms — keypace</title>
+<meta name="description" content="Privacy policy, terms of use, and AI coaching transparency for keypace.io." />
+<link rel="canonical" href="https://keypace.io/privacy.html" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+<script>
+  try {
+    var t = localStorage.getItem('keypace_theme_v1');
+    document.documentElement.setAttribute('data-theme', t || 'dusk');
+  } catch {}
+</script>
+<style>
+  html[data-theme="dusk"]     { --bg:#1a1b26;--bg-soft:#20212f;--panel:#232436;--border:#2e3047;--ink:#cdd1e0;--ink-dim:#7a7f96;--ink-faint:#3a3c52;--accent:#e8b339;--accent-dim:#5b4a23; }
+  html[data-theme="nord"]     { --bg:#1c212b;--bg-soft:#232934;--panel:#272e3a;--border:#353f4f;--ink:#d6dde8;--ink-dim:#5d6a80;--ink-faint:#3a4456;--accent:#7fb4d9;--accent-dim:#2f4658; }
+  html[data-theme="forest"]   { --bg:#141c18;--bg-soft:#1a241f;--panel:#1f2b24;--border:#2c3b32;--ink:#cfe0d3;--ink-dim:#5a7268;--ink-faint:#354a3d;--accent:#8bc78f;--accent-dim:#34492f; }
+  html[data-theme="rosepine"] { --bg:#1f1a24;--bg-soft:#26202c;--panel:#2b2433;--border:#3c3242;--ink:#e2d9e8;--ink-dim:#6e6078;--ink-faint:#443a4d;--accent:#d894a8;--accent-dim:#4f2f3a; }
+  html[data-theme="mono"]     { --bg:#161616;--bg-soft:#1d1d1d;--panel:#222222;--border:#333333;--ink:#e8e8e8;--ink-dim:#6b6b6b;--ink-faint:#3d3d3d;--accent:#f2f2f2;--accent-dim:#4a4a4a; }
+  html[data-theme="sunset"]   { --bg:#1c1412;--bg-soft:#241a17;--panel:#2b1f1b;--border:#3d2c25;--ink:#f0ddd2;--ink-dim:#7d5d4f;--ink-faint:#4a352c;--accent:#e8845c;--accent-dim:#5c3823; }
+  html[data-theme="paper"]    { --bg:#f4f1ea;--bg-soft:#ebe7dc;--panel:#fdfcf8;--border:#ddd6c7;--ink:#2b2620;--ink-dim:#8c8270;--ink-faint:#c9c1ae;--accent:#c2762f;--accent-dim:#ead9bd; }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink-dim);
+    min-height: 100vh;
+    line-height: 1.75;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* nav */
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 52px;
+  }
+  .nav-logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .nav-logo span { color: var(--accent); }
+  .nav-back {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: var(--ink-faint);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: color 0.15s;
+  }
+  .nav-back:hover { color: var(--ink-dim); }
+
+  /* tabs */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .tab {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-faint);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 16px;
+    margin-bottom: -1px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab:hover { color: var(--ink-dim); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* content panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* sections */
+  .section {
+    margin-bottom: 36px;
+    padding-bottom: 36px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.07em;
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--ink-faint);
+    margin-bottom: 40px;
+  }
+
+  p { margin-bottom: 10px; }
+  p:last-child { margin-bottom: 0; }
+
+  .highlight {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--ink-dim);
+  }
+
+  ul {
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 0;
+  }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .callout {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--ink-dim);
+    margin: 14px 0;
+  }
+
+  .footer {
+    margin-top: 52px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--ink-faint);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <nav class="nav">
+    <a href="/" class="nav-logo">keypace<span>_</span></a>
+    <a href="/" class="nav-back">← back to keypace</a>
+  </nav>
+
+  <h1>privacy & terms</h1>
+  <div class="subtitle">last updated july 2026</div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="privacy">privacy policy</button>
+    <button class="tab" data-tab="ai">ai coaching</button>
+    <button class="tab" data-tab="terms">terms of use</button>
+  </div>
+
+  <!-- PRIVACY POLICY -->
+  <div class="panel active" id="panel-privacy">
+
+    <div class="section">
+      <div class="section-title">what we collect</div>
+      <p>keypace collects the minimum data needed to provide the service.</p>
+      <ul>
+        <li><span class="highlight">typing test results</span> — wpm, accuracy, raw wpm, character counts, and test duration. stored locally in your browser and, if you sign in, in our database.</li>
+        <li><span class="highlight">diagnostic metrics</span> — inter-key intervals, character error rates, bigram timing, and hesitation patterns. calculated locally. a structured summary is sent to the ai coach when you request coaching. raw keystrokes are never transmitted.</li>
+        <li><span class="highlight">account information</span> — email address and display name, used for authentication and leaderboard display. your email is never shared with third parties or sent to anthropic.</li>
+        <li><span class="highlight">replay timestamps</span> — millisecond keypress timestamps for your most recent tests are stored locally for the ghost replay feature. these are not uploaded to our servers.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <div class="section-title">how we store your data</div>
+      <p><span class="highlight">locally</span> — test history, personal bests, settings, themes, and replay timestamps are stored in your browser's <span class="mono">localStorage</span>. clearing your browser data removes this.</p>
+      <p><span class="highlight">in the cloud</span> — if you sign in, your test history, personal bests, and display name are stored in a supabase database. your data is associated with your email address and protected by row-level security — only you can read or write your own data.</p>
+      <p><span class="highlight">leaderboard</span> — if you set a display name, your best scores for standard modes appear on the public leaderboard. your email address is never shown publicly.</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">third-party services</div>
+      <ul>
+        <li><span class="highlight">supabase</span> — database and authentication. your email is stored here. <a href="https://supabase.com/privacy" target="_blank">supabase privacy policy</a></li>
+        <li><span class="highlight">anthropic</span> — ai coaching. only structured diagnostic metrics are sent (no email, no display name, no raw keystrokes). <a href="https://www.anthropic.com/privacy" target="_blank">anthropic privacy policy</a></li>
+        <li><span class="highlight">cloudflare</span> — dns, hosting, and the api proxy worker. <a href="https://www.cloudflare.com/privacypolicy/" target="_blank">cloudflare privacy policy</a></li>
+        <li><span class="highlight">resend</span> — transactional email (magic links). your email address is processed to send authentication emails. <a href="https://resend.com/legal/privacy-policy" target="_blank">resend privacy policy</a></li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <div class="section-title">deleting your data</div>
+      <div class="callout">signing out does not delete your account or data. it only ends your session on that device.</div>
+      <p>to <span class="highlight">clear local data</span> — go to your browser settings and clear site data for keypace.io.</p>
+      <p>to <span class="highlight">delete your account and all cloud data permanently</span> — email <a href="mailto:contact@keypace.io">contact@keypace.io</a> with the subject line "account deletion request". we will permanently delete your account, test history, display name, and leaderboard entries within 7 days.</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">contact</div>
+      <p>questions about this policy: <a href="mailto:contact@keypace.io">contact@keypace.io</a></p>
+    </div>
+
+  </div>
+
+  <!-- AI COACHING -->
+  <div class="panel" id="panel-ai">
+
+    <div class="section">
+      <div class="section-title">how ai coaching works</div>
+      <p>after you complete a typing test, keypace runs a deterministic diagnostic engine entirely in your browser. this engine calculates factual metrics from your keypress data — no inference, no guessing.</p>
+      <p>these metrics are then summarized into a structured object and sent to anthropic's claude api (via a secure cloudflare worker) to generate a concise, evidence-based coaching insight.</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">what is sent to anthropic</div>
+      <p>only structured diagnostic metrics. for example:</p>
+      <div class="callout">
+        accuracy: 94% · slowest bigram: "th" at 340ms (2.1× your baseline) · limiter: consistency · speed decay: 8% · punctuation accuracy: 81%
+      </div>
+      <p class="highlight">what is never sent to anthropic:</p>
+      <ul>
+        <li>your raw keystrokes or the exact text you typed</li>
+        <li>your email address or display name</li>
+        <li>your authentication tokens or account information</li>
+        <li>any personally identifiable information</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <div class="section-title">what the ai coach can and cannot do</div>
+      <ul>
+        <li>the coach provides <span class="highlight">educational guidance only</span> — it is not a substitute for professional ergonomic, medical, or physical therapy advice</li>
+        <li>coaching insights are based on supplied metrics only — the model is instructed not to invent claims not supported by the data</li>
+        <li>ai responses may occasionally be imprecise or imperfect — use your own judgment</li>
+        <li>keypace does not diagnose physical conditions, finger placement, posture, or health issues</li>
+        <li>if the anthropic service is unavailable, a deterministic fallback insight is generated entirely locally from the same metrics</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <div class="section-title">ai security</div>
+      <p>the anthropic api key is never exposed in the browser or in any client-side code. all requests to anthropic go through a cloudflare worker that validates requests, restricts allowed origins to keypace.io, enforces payload size limits, and applies an 8-second timeout. the worker does not log typing content.</p>
+    </div>
+
+  </div>
+
+  <!-- TERMS OF USE -->
+  <div class="panel" id="panel-terms">
+
+    <div class="section">
+      <div class="section-title">using keypace</div>
+      <p>keypace is a free typing practice and coaching tool. by using it you agree to these terms.</p>
+      <ul>
+        <li>you may use keypace for personal, educational, and non-commercial purposes</li>
+        <li>you may not attempt to reverse-engineer, scrape, or abuse the service</li>
+        <li>you may not create accounts for the purpose of spamming or manipulating leaderboards</li>
+        <li>accounts must be used by a single person — shared or automated accounts are not permitted</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <div class="section-title">leaderboard and display names</div>
+      <ul>
+        <li>display names are public — choose one you're comfortable with</li>
+        <li>display names must not impersonate others, contain offensive content, or violate any applicable law</li>
+        <li>we reserve the right to remove display names or scores that violate these rules</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <div class="section-title">disclaimers</div>
+      <p>keypace is provided as-is without warranty of any kind. coaching insights are educational in nature and may be imperfect. keypace is not liable for decisions made based on coaching output. the service may be updated, changed, or discontinued at any time.</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">contact</div>
+      <p>questions or concerns: <a href="mailto:contact@keypace.io">contact@keypace.io</a></p>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <span>keypace.io · july 2026</span>
+    <a href="/">← back to keypace</a>
+  </div>
+
+</div>
+
+<script>
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>
