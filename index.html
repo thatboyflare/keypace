@@ -6320,48 +6320,51 @@ COACHING GUIDELINES:
     ctx.fillStyle = inkFaint;
     ctx.textAlign = 'center';
     ctx.letterSpacing = '0.08em';
-    ctx.fillText(modeLabel.toUpperCase(), CX, 148);
+    ctx.fillText(modeLabel.toUpperCase(), CX, 140);
     ctx.letterSpacing = '0';
 
     // ── Giant WPM — centered hero ─────────────────────────────────────────────
-    ctx.font = '700 220px monospace';
+    ctx.font = '700 195px monospace';
     ctx.fillStyle = accent;
     ctx.textAlign = 'center';
-    ctx.fillText(String(wpm), CX, 170);
+    ctx.fillText(String(wpm), CX, 158);
 
     // "wpm" unit below the number
-    ctx.font = '300 28px sans-serif';
+    ctx.font = '300 24px sans-serif';
     ctx.fillStyle = inkDim;
     ctx.textAlign = 'center';
-    ctx.fillText('words per minute', CX, 420);
+    ctx.fillText('words per minute', CX, 400);
+
+    // ── Coaching context line (if we have a diagnosis) ──────────────────────
+    const hasCoachLine = lastDiagnostics && lastDiagnostics.limiter && lastDiagnostics.limiter !== 'speed';
+    if (hasCoachLine) {
+      const LIMITER_LABELS = {
+        accuracy:       'keypace found: accuracy',
+        specific_chars: 'keypace found: character errors',
+        punctuation:    'keypace found: punctuation rhythm',
+        endurance:      'keypace found: endurance',
+        consistency:    'keypace found: consistency',
+      };
+      const coachLabel = LIMITER_LABELS[lastDiagnostics.limiter] || '';
+      if (coachLabel) {
+        ctx.font = '500 14px sans-serif';
+        ctx.fillStyle = hexToRgba(accent, 0.75);
+        ctx.textAlign = 'center';
+        ctx.fillText(coachLabel, CX, 430);
+      }
+    }
+
+    // ── Stat pills — pushed down when no coach line, up when there is one ───
+    const pillY = hasCoachLine ? 468 : 450;
 
     // ── Stat row — centered ────────────────────────────────────────────────────
     const stats = [
       { label: 'accuracy', value: `${acc}%` },
       { label: 'raw wpm',  value: String(raw) },
     ];
-    const pillW = 200, pillH = 80, pillGap = 24;
+    const pillW = 200, pillH = 76, pillGap = 24;
     const totalW = stats.length * pillW + (stats.length - 1) * pillGap;
     let sx = CX - totalW / 2;
-    const pillY = 476;
-
-    // ── Coaching context line (if we have a diagnosis) ──────────────────────
-    if (lastDiagnostics && lastDiagnostics.limiter && lastDiagnostics.limiter !== 'speed') {
-      const LIMITER_LABELS = {
-        accuracy:       'focus: accuracy',
-        specific_chars: 'focus: character accuracy',
-        punctuation:    'focus: punctuation rhythm',
-        endurance:      'focus: endurance',
-        consistency:    'focus: consistency',
-      };
-      const coachLabel = LIMITER_LABELS[lastDiagnostics.limiter] || '';
-      if (coachLabel) {
-        ctx.font = '500 13px sans-serif';
-        ctx.fillStyle = hexToRgba(accent, 0.7);
-        ctx.textAlign = 'center';
-        ctx.fillText(coachLabel, CX, 440);
-      }
-    }
 
     stats.forEach((s) => {
       // pill bg
