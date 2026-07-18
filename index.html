@@ -3925,14 +3925,16 @@
     if (state.mode === 'daily') {
       renderDailyComparison();
       // Submit score to leaderboard (fire-and-forget, only if signed in)
-      if (authSession) {
-        submitDailyScore(wpm, accClamped).catch(() => {});
-      }
-      // Load leaderboard for today
+      // Load leaderboard for today — wait for score submission first
       const today = getDailyDateStr();
       document.getElementById('dailyLeaderboard').classList.add('show');
       document.getElementById('lbList').innerHTML = '<div class="lb-loading">loading scores…</div>';
-      fetchLeaderboard(today).then(rows => {
+
+      const submitPromise = authSession
+        ? submitDailyScore(wpm, accClamped).catch(() => {})
+        : Promise.resolve();
+
+      submitPromise.then(() => fetchLeaderboard(today)).then(rows => {
         renderLeaderboard(rows, authSession?.user?.id, today);
       }).catch(() => {
         document.getElementById('lbList').innerHTML = '<div class="lb-empty">Could not load scores.</div>';
