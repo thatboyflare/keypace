@@ -1192,6 +1192,85 @@
     animation: caretblink 1s steps(1) infinite;
   }
 
+  /* ---------- session progress bar ---------- */
+  .session-progress {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 2px 4px;
+    flex-wrap: wrap;
+  }
+  .sp-step {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ink-faint);
+    padding: 3px 8px;
+    border-radius: 20px;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+  }
+  .sp-step.sp-done {
+    color: var(--good);
+    border-color: transparent;
+  }
+  .sp-step.sp-current {
+    color: var(--accent);
+    border-color: var(--accent-dim);
+    background: var(--accent-wash);
+    font-weight: 600;
+  }
+  .sp-sep {
+    font-size: 10px;
+    color: var(--ink-faint);
+    opacity: 0.5;
+  }
+
+  /* ---------- account prompt banner ---------- */
+  .account-prompt-banner {
+    background: var(--panel);
+    border: 1px solid var(--accent-dim);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    animation: rise 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .apb-inner {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .apb-text { flex: 1; min-width: 160px; }
+  .apb-title {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 3px;
+  }
+  .apb-body {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink-dim);
+    line-height: 1.5;
+  }
+  .apb-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .apb-save-btn { font-size: 12px; padding: 8px 16px; }
+  .apb-skip {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ink-faint);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+  }
+  .apb-skip:hover { color: var(--ink-dim); }
+
   /* ---------- drill CTA ---------- */
   .drill-cta {
     background: var(--panel);
@@ -2760,6 +2839,19 @@
         </button>
       </div>
 
+      <!-- First-session progress bar — only visible to new users in first session -->
+      <div class="session-progress" id="sessionProgress" style="display:none">
+        <div class="sp-step sp-current" data-label="baseline">baseline</div>
+        <div class="sp-sep">→</div>
+        <div class="sp-step" data-label="diagnosis">diagnosis</div>
+        <div class="sp-sep">→</div>
+        <div class="sp-step" data-label="drill">practice</div>
+        <div class="sp-sep">→</div>
+        <div class="sp-step" data-label="retest">retest</div>
+        <div class="sp-sep">→</div>
+        <div class="sp-step" data-label="done">save</div>
+      </div>
+
       <div class="auto-insight" id="autoInsight">
         <div class="ai-insight-header">
           <div class="ai-insight-avatar">
@@ -2925,24 +3017,24 @@
       <div class="hint-tagline">every typing test should teach you something.</div>
     </div>
 
-    <!-- Sample coach report — looks exactly like a real one -->
+    <!-- Sample coach report -->
     <div class="hint-report">
       <div class="hint-report-label">sample coach insight</div>
       <div class="hint-report-headline">your speed is strong, but punctuation is costing you 14 wpm</div>
       <div class="hint-report-rows">
         <div class="hint-report-row">
           <div class="hint-report-row-title">finding</div>
-          <div class="hint-report-row-body">punctuation accuracy was 81% — you hesitated most after quotation marks and before capital letters. average delay: 610ms vs your 290ms baseline.</div>
+          <div class="hint-report-row-body">punctuation accuracy was 81% — average delay 610ms vs your 290ms baseline.</div>
         </div>
       </div>
       <div class="hint-drill">
-        <div class="hint-drill-text"><strong>recommended drill</strong> — punctuation rhythm · 30s · hit 90%+ accuracy</div>
+        <div class="hint-drill-text"><strong>recommended drill</strong> — punctuation rhythm · 30s</div>
         <div class="hint-drill-badge">personalized</div>
       </div>
     </div>
 
     <div class="hint-actions">
-      <button class="btn primary hint-start-btn" id="hintStartBtn">start typing →</button>
+      <button class="btn primary hint-start-btn" id="hintStartBtn">take my 30-second baseline →</button>
       <div class="hint-skip">keypace analyzes your real typing — this is just an example</div>
     </div>
 
@@ -3534,6 +3626,10 @@
     state.startTime = performance.now();
     _lastSampleMs = state.startTime;
     document.body.classList.add('is-typing');
+    analytics.track('test_started', {
+      mode: state.mode,
+      duration_category: state.mode === 'time' ? `${state.val}s` : `${state.val}w`,
+    });
     if (state.mode === 'time') {
       timerEl.classList.add('show');
       state.timerId = setInterval(tick, 1000);
@@ -6249,6 +6345,24 @@ COACHING GUIDELINES:
     let sx = CX - totalW / 2;
     const pillY = 476;
 
+    // ── Coaching context line (if we have a diagnosis) ──────────────────────
+    if (lastDiagnostics && lastDiagnostics.limiter && lastDiagnostics.limiter !== 'speed') {
+      const LIMITER_LABELS = {
+        accuracy:       'focus: accuracy',
+        specific_chars: 'focus: character accuracy',
+        punctuation:    'focus: punctuation rhythm',
+        endurance:      'focus: endurance',
+        consistency:    'focus: consistency',
+      };
+      const coachLabel = LIMITER_LABELS[lastDiagnostics.limiter] || '';
+      if (coachLabel) {
+        ctx.font = '500 13px sans-serif';
+        ctx.fillStyle = hexToRgba(accent, 0.7);
+        ctx.textAlign = 'center';
+        ctx.fillText(coachLabel, CX, 440);
+      }
+    }
+
     stats.forEach((s) => {
       // pill bg
       ctx.fillStyle = hexToRgba(accent, 0.07);
@@ -6425,10 +6539,74 @@ COACHING GUIDELINES:
   const autoInsightText = document.getElementById('autoInsightText');
 
   // ================================================================
-  // DIAGNOSTIC ENGINE
-  // Runs purely on captured keystroke data — no inference or guessing.
-  // Returns a DiagnosticResult that the coach and drill generator use.
+  // ANALYTICS ABSTRACTION
+  // Lightweight event tracking. All calls go through track() so the
+  // provider can be swapped without touching call sites.
+  // No raw typing data, keystrokes, email, username, or PII ever logged.
+  // If the provider is unavailable, events are silently dropped.
+  //
+  // To enable: set window.KP_ANALYTICS_KEY to your provider's write key
+  // before this script runs, or configure via meta tag.
+  // Supported providers: plausible (default stub), posthog, or custom.
   // ================================================================
+
+  const analytics = (() => {
+    // Safe device class — no fingerprinting
+    function deviceClass() {
+      if (typeof window === 'undefined') return 'unknown';
+      return window.innerWidth < 600 ? 'mobile' : window.innerWidth < 1024 ? 'tablet' : 'desktop';
+    }
+
+    // Safe referrer category — no full URL stored
+    function referrerCategory() {
+      try {
+        const ref = document.referrer;
+        if (!ref) return 'direct';
+        if (ref.includes('google') || ref.includes('bing') || ref.includes('duckduckgo')) return 'search';
+        if (ref.includes('twitter') || ref.includes('x.com')) return 'social_twitter';
+        if (ref.includes('reddit')) return 'social_reddit';
+        if (ref.includes('keypace.io')) return 'internal';
+        return 'other';
+      } catch { return 'unknown'; }
+    }
+
+    function track(event, props = {}) {
+      try {
+        // Scrub any accidental PII — these fields must never appear in events
+        const FORBIDDEN = ['email','username','token','access_token','refresh_token',
+          'typed','text','words','keystroke','timestamps','rawText'];
+        const safe = Object.fromEntries(
+          Object.entries(props).filter(([k]) => !FORBIDDEN.some(f => k.toLowerCase().includes(f)))
+        );
+
+        const payload = {
+          event,
+          ...safe,
+          device: deviceClass(),
+          signed_in: !!authSession,
+          ts: Date.now(),
+        };
+
+        // Console log in dev — replace with provider call when key is set
+        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+          console.debug('[kp:analytics]', event, payload);
+        }
+
+        // Plausible — fires if plausible script is loaded
+        if (typeof window.plausible === 'function') {
+          window.plausible(event, { props: safe });
+        }
+
+        // PostHog — fires if posthog is loaded
+        if (typeof window.posthog !== 'undefined' && window.posthog.capture) {
+          window.posthog.capture(event, safe);
+        }
+
+      } catch { /* analytics failure must never break the app */ }
+    }
+
+    return { track, deviceClass, referrerCategory };
+  })();
 
   // ================================================================
   // DIAGNOSTIC ENGINE  v2
@@ -6915,6 +7093,19 @@ COACHING GUIDELINES:
     const drill = generateDrill(diag);
     lastDrill = drill;
 
+    analytics.track('test_completed', {
+      mode: state.mode,
+      duration_category: state.mode === 'time' ? `${state.val}s` : `${state.val}w`,
+      wpm_band: Math.floor(wpm / 20) * 20, // bucketed, not exact
+      acc_band: Math.floor(acc / 5) * 5,
+    });
+    analytics.track('diagnosis_displayed', {
+      limiter: diag.limiter,
+      has_enough_data: diag.hasEnoughData,
+      has_timing_data: diag.hasTimingData,
+      confidence: diag.hasEnoughData ? 'eligible' : 'low',
+    });
+
     // Show the drill CTA button immediately (doesn't wait for AI)
     renderDrillCTA(drill);
 
@@ -7041,6 +7232,12 @@ Rules:
     const existingCta = document.getElementById('drillCta');
     if (existingCta) existingCta.remove();
 
+    analytics.track('recommended_drill_displayed', {
+      drill_type: drill.drillType,
+      limiter: drill.basedOn?.limiter,
+      target_metric: drill.targetMetric,
+    });
+
     const cta = document.createElement('div');
     cta.id = 'drillCta';
     cta.className = 'drill-cta';
@@ -7070,6 +7267,12 @@ Rules:
 
   function startDrill() {
     if (!lastDrill || !lastDiagnostics) return;
+
+    analytics.track('recommended_drill_started', {
+      drill_type: lastDrill.drillType,
+      limiter: lastDrill.basedOn?.limiter,
+      target_metric: lastDrill.targetMetric,
+    });
 
     // Save snapshot for before/after comparison
     predrillSnapshot = {
@@ -7254,7 +7457,14 @@ Rules:
       </button>
     `;
     result.insertBefore(banner, result.querySelector('.result-actions'));
-    document.getElementById('retestBtn').addEventListener('click', () => startRetest(snap, targetMeasure));
+    document.getElementById('retestBtn').addEventListener('click', () => {
+      analytics.track('retest_started', {
+        drill_type: snap.drill.drillType,
+        target_metric: snap.drill.targetMetric,
+        target_met: targetMeasure.met,
+      });
+      startRetest(snap, targetMeasure);
+    });
 
     lastDiagnostics = drillDiag;
     lastDrill = generateDrill(drillDiag);
@@ -7262,8 +7472,19 @@ Rules:
     autoInsightText.className = 'ai-insight-text';
     autoInsightText.textContent = buildFallbackInsight(drillDiag);
 
+    analytics.track('recommended_drill_completed', {
+      drill_type: snap.drill.drillType,
+      target_metric: snap.drill.targetMetric,
+      target_met: targetMeasure.met,
+      insufficient_samples: !!targetMeasure.insufficientSamples,
+    });
+
     renderDrillCTA(lastDrill);
     renderHistory();
+
+    // Show account prompt if user isn't signed in and has completed a drill
+    if (!authSession) showAccountPrompt('drill');
+
     predrillSnapshot = null;
   }
 
@@ -7374,8 +7595,24 @@ Rules:
     autoInsightEl.classList.add('show');
     autoInsightText.className = 'ai-insight-text';
     autoInsightText.textContent = buildFallbackInsight(retestDiag);
+
+    analytics.track('retest_completed', {
+      drill_type: originalSnap.drill.drillType,
+      target_metric: originalSnap.drill.targetMetric,
+      outcome: retestMeasure.insufficientSamples ? 'insufficient_samples'
+             : improved ? 'verified_improvement'
+             : mixed    ? 'mixed'
+             : 'no_change',
+    });
+    if (improved) analytics.track('improvement_verified', { target_metric: originalSnap.drill.targetMetric });
+    else analytics.track('improvement_not_verified', { target_metric: originalSnap.drill.targetMetric, reason: retestMeasure.insufficientSamples ? 'insufficient_samples' : 'no_change' });
+
     renderDrillCTA(lastDrill);
     renderHistory();
+
+    // Show account prompt after retest — user has now seen the full value loop
+    if (!authSession) showAccountPrompt('retest');
+
     retestContext = null;
   }
 
@@ -7539,35 +7776,170 @@ Rules:
     loadLeaderboardTab(lbCurrentMode);
   });
 
-  // ---------------- first-visit hint ----------------
+  // ---------------- first-session guided flow ----------------
   const hintOverlay = document.getElementById('hintOverlay');
-  const HINT_KEY = 'keypace_visited_v1';
+  const HINT_KEY      = 'keypace_visited_v1';
+  const SESSION_STEP_KEY = 'keypace_session_step_v1'; // 'baseline'|'drill'|'retest'|'done'
+  const ACCOUNT_PROMPT_KEY = 'keypace_account_prompt_v1'; // flag so we only show it once
+
+  const isNewUser = !localStorage.getItem(HINT_KEY);
+  const isSignedIn = !!authSession;
 
   function dismissHint() {
     if (!hintOverlay || hintOverlay.classList.contains('gone')) return;
-    try { localStorage.setItem(HINT_KEY, '1'); } catch (e) {}
+    try { localStorage.setItem(HINT_KEY, '1'); } catch {}
     hintOverlay.classList.add('hiding');
     setTimeout(() => hintOverlay.classList.add('gone'), 320);
     focusInput();
   }
 
-  // Only show on first visit
-  try {
-    if (localStorage.getItem(HINT_KEY)) {
-      hintOverlay.classList.add('gone');
-    }
-  } catch (e) {
-    hintOverlay.classList.add('gone');
+  // Show progress indicator during first session
+  function updateSessionProgress(step) {
+    // step: 'baseline' | 'drill' | 'retest' | 'done'
+    try { localStorage.setItem(SESSION_STEP_KEY, step); } catch {}
+    const bar = document.getElementById('sessionProgress');
+    if (!bar) return;
+    const steps = ['baseline', 'drill', 'retest', 'done'];
+    const idx = steps.indexOf(step);
+    bar.querySelectorAll('.sp-step').forEach((el, i) => {
+      el.classList.toggle('sp-done',    i < idx);
+      el.classList.toggle('sp-current', i === idx);
+    });
+    bar.style.display = step === 'done' ? 'none' : '';
   }
 
-  document.getElementById('hintStartBtn').addEventListener('click', dismissHint);
+  // Show or hide session progress bar based on where user is in the flow
+  function initSessionProgress() {
+    const step = (() => {
+      try { return localStorage.getItem(SESSION_STEP_KEY) || 'baseline'; } catch { return 'baseline'; }
+    })();
+    if (step === 'done' || isSignedIn) {
+      const bar = document.getElementById('sessionProgress');
+      if (bar) bar.style.display = 'none';
+      return;
+    }
+    updateSessionProgress(step);
+  }
 
-  // Dismiss on first keystroke anywhere
+  // Account prompt — shown after the user has experienced value (post-drill or post-retest)
+  const ACCOUNT_PROMPT_TRIGGER_COUNT = 1; // show after the first eligible trigger
+
+  function showAccountPrompt(trigger) {
+    // Never show if already signed in or already shown
+    if (authSession) return;
+    try { if (localStorage.getItem(ACCOUNT_PROMPT_KEY)) return; } catch {}
+
+    analytics.track('account_prompt_displayed', { trigger });
+    try { localStorage.setItem(ACCOUNT_PROMPT_KEY, '1'); } catch {}
+
+    const existing = document.getElementById('accountPromptBanner');
+    if (existing) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'accountPromptBanner';
+    banner.className = 'account-prompt-banner';
+    banner.innerHTML = `
+      <div class="apb-inner">
+        <div class="apb-text">
+          <div class="apb-title">save your typing profile</div>
+          <div class="apb-body">keep your diagnoses, drills, and personal bests synced across devices.</div>
+        </div>
+        <div class="apb-actions">
+          <button class="btn primary apb-save-btn" id="apbSaveBtn">save my progress</button>
+          <button class="btn-text apb-skip" id="apbSkip">not now</button>
+        </div>
+      </div>
+    `;
+
+    // Insert after result-actions
+    const resultActions = result.querySelector('.result-actions');
+    if (resultActions) result.insertBefore(banner, resultActions.nextSibling);
+    else result.appendChild(banner);
+
+    document.getElementById('apbSaveBtn').addEventListener('click', () => {
+      analytics.track('account_creation_started', { trigger });
+      // Open the account panel to the sign-in form
+      closeThemePanel(); closeFontPanel(); closeSyncPanel(); closeAccountPanel();
+      document.getElementById('accountBtn').click();
+      banner.remove();
+    });
+
+    document.getElementById('apbSkip').addEventListener('click', () => {
+      banner.remove();
+    });
+  }
+
+  // Only show hint on first visit
+  if (!isNewUser) {
+    hintOverlay.classList.add('gone');
+  } else {
+    analytics.track('landing_viewed', {
+      referrer: analytics.referrerCategory(),
+    });
+  }
+
+  document.getElementById('hintStartBtn').addEventListener('click', () => {
+    analytics.track('baseline_cta_clicked');
+    // Set 30s mode as the baseline
+    state.mode = 'time';
+    state.val  = 30;
+    modesNav.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('active',
+        b.dataset.mode === 'time' && parseInt(b.dataset.val) === 30);
+    });
+    saveMode('time', 30);
+    buildTest();
+    dismissHint();
+    updateSessionProgress('baseline');
+  });
+
+  // Dismiss on any keystroke (quick typists)
   document.addEventListener('keydown', function hintKeyDismiss(e) {
     if (e.key === 'Tab' || e.key === 'Meta' || e.key === 'Control' || e.key === 'Alt') return;
     dismissHint();
     document.removeEventListener('keydown', hintKeyDismiss);
   }, { once: false });
+
+  initSessionProgress();
+
+  // Hook into key flow moments to advance the progress bar
+  // (drill start advances to 'drill', retest start to 'retest', retest done to 'done')
+  const _origStartDrill  = startDrill;
+  const _origStartRetest = startRetest;
+
+  startDrill = function(...args) {
+    updateSessionProgress('drill');
+    return _origStartDrill.apply(this, args);
+  };
+
+  startRetest = function(...args) {
+    updateSessionProgress('retest');
+    return _origStartRetest.apply(this, args);
+  };
+
+  // After account creation, mark session as done and remove progress bar
+  // (detected by auth redirect completing)
+  const _origHandleAuthRedirect = handleAuthRedirect;
+  handleAuthRedirect = async function() {
+    const result = await _origHandleAuthRedirect.apply(this, arguments);
+    if (authSession) {
+      try { localStorage.setItem(SESSION_STEP_KEY, 'done'); } catch {}
+      const bar = document.getElementById('sessionProgress');
+      if (bar) bar.style.display = 'none';
+      analytics.track('account_created');
+    }
+    return result;
+  };
+
+  // Track share events
+  const _origShareBtn = document.getElementById('shareBtn');
+  if (_origShareBtn) {
+    _origShareBtn.addEventListener('click', () => {
+      analytics.track('result_share_opened', {
+        mode: lastResultData?.mode,
+      });
+    });
+  }
 
   // ---------------- init ----------------
   buildTest();
