@@ -51,7 +51,7 @@
     --border: #2e3047;
     --ink: #cdd1e0;
     --ink-dim: #565869;
-    --ink-faint: #3a3c52;
+    --ink-faint: #6b6f8a;
     --accent: #e8b339;
     --accent-hover: #f0c050;
     --accent-dim: #5b4a23;
@@ -76,7 +76,7 @@
     --border: #2e3047;
     --ink: #cdd1e0;
     --ink-dim: #565869;
-    --ink-faint: #3a3c52;
+    --ink-faint: #6b6f8a;
     --accent: #e8b339;
     --accent-hover: #f0c050;
     --accent-dim: #5b4a23;
@@ -94,7 +94,7 @@
     --border: #353f4f;
     --ink: #d6dde8;
     --ink-dim: #5d6a80;
-    --ink-faint: #3a4456;
+    --ink-faint: #637080;
     --accent: #7fb4d9;
     --accent-hover: #93c1e0;
     --accent-dim: #2f4658;
@@ -112,7 +112,7 @@
     --border: #2c3b32;
     --ink: #cfe0d3;
     --ink-dim: #5a7268;
-    --ink-faint: #354a3d;
+    --ink-faint: #5a7060;
     --accent: #8bc78f;
     --accent-hover: #9fd4a2;
     --accent-dim: #34492f;
@@ -130,7 +130,7 @@
     --border: #3c3242;
     --ink: #e2d9e8;
     --ink-dim: #6e6078;
-    --ink-faint: #443a4d;
+    --ink-faint: #6e6070;
     --accent: #d894a8;
     --accent-hover: #e1a5b8;
     --accent-dim: #4f2f3a;
@@ -148,7 +148,7 @@
     --border: #333333;
     --ink: #e8e8e8;
     --ink-dim: #6b6b6b;
-    --ink-faint: #3d3d3d;
+    --ink-faint: #666666;
     --accent: #f2f2f2;
     --accent-hover: #ffffff;
     --accent-dim: #4a4a4a;
@@ -166,7 +166,7 @@
     --border: #3d2c25;
     --ink: #f0ddd2;
     --ink-dim: #7d5d4f;
-    --ink-faint: #4a352c;
+    --ink-faint: #7a5a4a;
     --accent: #e8845c;
     --accent-hover: #f0966f;
     --accent-dim: #5c3823;
@@ -789,6 +789,26 @@
     overflow: hidden;
   }
   .field.blurred { filter: blur(6px); opacity: 0.6; }
+
+  /* ── Tape mode ────────────────────────────────────────────────────────── */
+  /* The field becomes a single horizontal line. Text is wrapped in an inner
+     span that slides left via translateX, keeping the caret visually fixed
+     at roughly the left-center of the field. No vertical scroll needed. */
+  .field.tape-mode {
+    white-space: nowrap;
+    overflow: hidden;
+    max-height: none;
+    height: 1.7em; /* exactly one line */
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+  .tape-inner {
+    display: inline-block;
+    white-space: nowrap;
+    transition: transform 0.06s linear;
+    will-change: transform;
+  }
 
   /* ── Zen mode ──────────────────────────────────────────────────────────── */
   .zen-stage {
@@ -2726,6 +2746,10 @@
       <span class="tdot"></span>code
     </button>
     <span class="toggles-sep"></span>
+    <button class="toggle-btn" id="toggleTape" title="Tape mode — single scrolling line">
+      <span class="tdot"></span>tape
+    </button>
+    <span class="toggles-sep"></span>
     <button class="toggle-btn icon-only" id="toggleSound" title="Toggle keystroke sound">
       <svg class="snd-on" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
       <svg class="snd-off" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
@@ -3151,7 +3175,7 @@
     try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* storage unavailable */ }
   }
 
-  const settings = Object.assign({ punctuation: false, numbers: false, sound: false, soundStyle: 'click', code: false }, loadJSON(SETTINGS_KEY, {}));
+  const settings = Object.assign({ punctuation: false, numbers: false, sound: false, soundStyle: 'click', code: false, tape: false }, loadJSON(SETTINGS_KEY, {}));
   let bests = loadJSON(BESTS_KEY, {});       // { "time:30": {wpm, acc, date}, ... }
   let history = loadJSON(HISTORY_KEY, []);   // [ {key, wpm, acc, date}, ... ] newest first, capped
 
@@ -3418,6 +3442,7 @@
   // ---------------- render ----------------
   let cachedSpans = [];
   let cachedPositions = [];
+  let tapeInner = null; // the sliding wrapper in tape mode
 
   function renderField() {
     const frag = document.createDocumentFragment();
@@ -3438,11 +3463,24 @@
     });
 
     field.innerHTML = '';
-    field.appendChild(frag);
+
+    if (settings.tape) {
+      // Tape mode: wrap all spans in a sliding div
+      field.classList.add('tape-mode');
+      tapeInner = document.createElement('div');
+      tapeInner.className = 'tape-inner';
+      tapeInner.appendChild(frag);
+      field.appendChild(tapeInner);
+    } else {
+      field.classList.remove('tape-mode');
+      tapeInner = null;
+      field.appendChild(frag);
+    }
 
     caretEl = document.createElement('div');
     caretEl.className = 'caret blink';
-    field.appendChild(caretEl);
+    if (tapeInner) tapeInner.appendChild(caretEl);
+    else field.appendChild(caretEl);
   }
 
   function charSpans() { return cachedSpans; }
@@ -3452,31 +3490,38 @@
 
     const idx = Math.min(state.typed.length, cachedSpans.length - 1);
     const target = cachedSpans[idx];
+    if (!target) return;
     const isEnd = state.typed.length >= cachedSpans.length;
 
-    const fieldRect = field.getBoundingClientRect();
-    const tRect = target.getBoundingClientRect();
-    const lineHeight = getLineHeight();
+    if (settings.tape && tapeInner) {
+      // Tape mode: slide tapeInner left so caret stays at anchor point
+      const caretX = target.offsetLeft + (isEnd ? target.offsetWidth : 0);
+      const anchorX = Math.round(field.offsetWidth * 0.3);
+      const shift    = Math.max(0, caretX - anchorX);
+      tapeInner.style.transition = instant ? 'none' : 'transform 0.08s cubic-bezier(0, 0, 0.2, 1)';
+      tapeInner.style.transform  = `translateX(-${shift}px)`;
+      // Caret sits inside tapeInner at its natural x position
+      caretEl.style.transition = 'none';
+      caretEl.style.transform  = `translate3d(${caretX}px, 0px, 0)`;
+      const lh = target.offsetHeight || getLineHeight();
+      caretEl.style.height = `${Math.round(lh * 0.75)}px`;
+      caretEl.style.top    = `${Math.round(lh * 0.12)}px`;
+    } else {
+      // Normal multi-line mode
+      const fieldRect  = field.getBoundingClientRect();
+      const tRect      = target.getBoundingClientRect();
+      const lineHeight = getLineHeight();
+      const x          = (tRect.left - fieldRect.left) + field.scrollLeft + (isEnd ? tRect.width : 0);
+      const yAbsRaw    = (tRect.top - fieldRect.top) + field.scrollTop;
+      const lineIdx    = Math.round(yAbsRaw / lineHeight);
 
-    const x = (tRect.left - fieldRect.left) + field.scrollLeft + (isEnd ? tRect.width : 0);
-    const yAbsRaw = (tRect.top - fieldRect.top) + field.scrollTop;
-    const lineIdx = Math.round(yAbsRaw / lineHeight);
+      const desiredScrollTop = Math.round(Math.max(0, lineIdx - 1) * lineHeight);
+      if (field.scrollTop !== desiredScrollTop) field.scrollTop = desiredScrollTop;
 
-    // Scroll to keep caret on middle row
-    const desiredScrollLines = Math.max(0, lineIdx - 1);
-    const desiredScrollTop = Math.round(desiredScrollLines * lineHeight);
-    if (field.scrollTop !== desiredScrollTop) {
-      field.scrollTop = desiredScrollTop;
+      const y = lineIdx * lineHeight;
+      caretEl.style.transition = instant ? 'none' : 'transform 0.1s cubic-bezier(0.2, 0, 0.2, 1)';
+      caretEl.style.transform  = `translate3d(${x}px, ${y}px, 0)`;
     }
-
-    // y = the caret's unscrolled absolute position within the field.
-    // The caret is position:absolute inside the scrolling field, so the
-    // browser automatically shifts it by -scrollTop when rendering —
-    // do NOT subtract scrollTop here or it gets applied twice.
-    const y = lineIdx * lineHeight;
-
-    caretEl.style.transition = instant ? 'none' : 'transform 0.1s cubic-bezier(0.2, 0, 0.2, 1)';
-    caretEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
 
     caretEl.classList.remove('blink');
     if (instant) {
@@ -3799,7 +3844,11 @@
       frag.appendChild(span);
       cachedSpans[startIdx + j] = span;
     });
-    field.insertBefore(frag, caretEl);
+    if (settings.tape && tapeInner) {
+      tapeInner.insertBefore(frag, caretEl);
+    } else {
+      field.insertBefore(frag, caretEl);
+    }
     updateCaret(true);
   }
 
@@ -4947,6 +4996,7 @@
     togglePunct.classList.toggle('active', settings.punctuation);
     toggleNums.classList.toggle('active', settings.numbers);
     document.getElementById('toggleCode').classList.toggle('active', settings.code);
+    document.getElementById('toggleTape').classList.toggle('active', settings.tape);
     toggleSound.classList.toggle('active', settings.sound);
     toggleSound.querySelector('.snd-on').style.display = settings.sound ? '' : 'none';
     toggleSound.querySelector('.snd-off').style.display = settings.sound ? 'none' : '';
@@ -4976,6 +5026,14 @@
     settings.code = !settings.code;
     // Code mode disables punctuation/numbers toggles (code already has them)
     if (settings.code) { settings.punctuation = false; settings.numbers = false; }
+    saveJSON(SETTINGS_KEY, settings);
+    applySettingsToUI();
+    buildTest();
+    focusInput();
+  });
+
+  document.getElementById('toggleTape').addEventListener('click', () => {
+    settings.tape = !settings.tape;
     saveJSON(SETTINGS_KEY, settings);
     applySettingsToUI();
     buildTest();
