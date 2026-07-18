@@ -791,23 +791,31 @@
   .field.blurred { filter: blur(6px); opacity: 0.6; }
 
   /* ── Tape mode ────────────────────────────────────────────────────────── */
-  /* The field becomes a single horizontal line. Text is wrapped in an inner
-     span that slides left via translateX, keeping the caret visually fixed
-     at roughly the left-center of the field. No vertical scroll needed. */
   .field.tape-mode {
-    white-space: nowrap;
     overflow: hidden;
     max-height: none;
-    height: 1.7em; /* exactly one line */
-    display: flex;
-    align-items: center;
+    height: 1.8em;
     position: relative;
+    /* Bleed beyond the normal wrap padding to use more screen width */
+    margin-left: -28px;
+    margin-right: -28px;
+    padding: 0 28px;
+    box-sizing: border-box;
+    font-size: 32px;
+  }
+  @media (max-width: 600px) {
+    .field.tape-mode { margin-left: -18px; margin-right: -18px; padding: 0 18px; font-size: 26px; }
   }
   .tape-inner {
-    display: inline-block;
+    display: block;
     white-space: nowrap;
-    transition: transform 0.06s linear;
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* padding-left matches the anchor point so first char starts at anchor */
+    padding-left: 30%;
     will-change: transform;
+    line-height: 1.8em;
   }
 
   /* ── Zen mode ──────────────────────────────────────────────────────────── */
@@ -3494,18 +3502,25 @@
     const isEnd = state.typed.length >= cachedSpans.length;
 
     if (settings.tape && tapeInner) {
-      // Tape mode: slide tapeInner left so caret stays at anchor point
+      // tapeInner has position:absolute inside the field with padding-left:30%
+      // baked in. Caret is inside tapeInner. Slide tapeInner left so the
+      // caret stays visually at the left-anchor position.
       const caretX = target.offsetLeft + (isEnd ? target.offsetWidth : 0);
-      const anchorX = Math.round(field.offsetWidth * 0.3);
-      const shift    = Math.max(0, caretX - anchorX);
+      // The anchor is the padding-left of tapeInner (30% of field width)
+      const anchorX = Math.round(field.offsetWidth * 0.30);
+      const shift   = Math.max(0, caretX - anchorX);
+
       tapeInner.style.transition = instant ? 'none' : 'transform 0.08s cubic-bezier(0, 0, 0.2, 1)';
       tapeInner.style.transform  = `translateX(-${shift}px)`;
-      // Caret sits inside tapeInner at its natural x position
+
+      // Caret: position:absolute inside tapeInner, x at caretX, vertically centered
+      const fieldH  = field.offsetHeight;
+      const caretH  = Math.round(fieldH * 0.72);
+      const caretTop = Math.round((fieldH - caretH) / 2);
       caretEl.style.transition = 'none';
-      caretEl.style.transform  = `translate3d(${caretX}px, 0px, 0)`;
-      const lh = target.offsetHeight || getLineHeight();
-      caretEl.style.height = `${Math.round(lh * 0.75)}px`;
-      caretEl.style.top    = `${Math.round(lh * 0.12)}px`;
+      caretEl.style.transform  = `translate3d(${caretX}px, ${caretTop}px, 0)`;
+      caretEl.style.height     = `${caretH}px`;
+      caretEl.style.top        = '0';
     } else {
       // Normal multi-line mode
       const fieldRect  = field.getBoundingClientRect();
