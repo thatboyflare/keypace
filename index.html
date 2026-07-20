@@ -871,6 +871,55 @@
   body.zen-mode .toggles { opacity: 0.3; transition: opacity 0.3s ease; }
   body.zen-mode .toggles:hover { opacity: 1; }
 
+  /* ── Drill / retest context banner ────────────────────────────────────── */
+  .drill-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--accent-wash);
+    border: 1px solid var(--accent-dim);
+    border-radius: 10px;
+    padding: 8px 14px;
+    animation: rise 0.25s ease;
+    gap: 12px;
+  }
+  .drill-banner-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+  .drill-banner-icon { color: var(--accent); flex-shrink: 0; display: flex; }
+  .drill-banner-label {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .drill-banner-goal {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ink-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .drill-banner-exit {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ink-faint);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 3px 9px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .drill-banner-exit:hover { color: var(--ink); border-color: var(--ink-dim); }
+
   .capslock-warning {
     display: none;
     align-items: center;
@@ -2771,6 +2820,18 @@
 
   <main>
     <div class="stage" id="stage">
+      <!-- Drill/retest context banner — shown only during targeted practice -->
+      <div class="drill-banner" id="drillBanner" style="display:none">
+        <div class="drill-banner-inner">
+          <span class="drill-banner-icon">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"></polyline><polyline points="6 17 11 12 6 7"></polyline></svg>
+          </span>
+          <span class="drill-banner-label" id="drillBannerLabel">targeted drill</span>
+          <span class="drill-banner-goal" id="drillBannerGoal"></span>
+        </div>
+        <button class="drill-banner-exit" id="drillBannerExit" title="Exit drill">exit drill</button>
+      </div>
+
       <div class="topline">
         <div class="timer" id="timer">30</div>
         <div class="topline-right">
@@ -3397,6 +3458,12 @@
     document.getElementById('zenStage').style.display = 'none';
     document.getElementById('stage').style.display = 'flex';
     cachedLineHeight = null; cachedPositions = [];
+
+    // Hide drill banner when starting a normal test
+    if (state.mode !== '_drill' && state.mode !== '_retest') {
+      const db = document.getElementById('drillBanner');
+      if (db) db.style.display = 'none';
+    }
 
     renderField();
     timerEl.textContent = state.mode === 'time' ? state.val : '';
@@ -5819,6 +5886,21 @@
     zenField.focus();
   });
 
+  // Drill banner exit — returns to last normal mode
+  document.getElementById('drillBannerExit').addEventListener('click', () => {
+    predrillSnapshot = null;
+    retestContext    = null;
+    const last = loadMode();
+    state.mode = (last && !['_drill','_retest'].includes(last.mode)) ? last.mode : 'time';
+    state.val  = (last && !['_drill','_retest'].includes(last.mode)) ? last.val  : 30;
+    modesNav.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('active',
+        b.dataset.mode === state.mode && (parseInt(b.dataset.val) || 0) === (state.val || 0));
+    });
+    buildTest();
+    focusInput();
+  });
+
   // ---------------- caps lock warning ----------------
   const capslockWarning = document.getElementById('capslockWarning');
 
@@ -7352,6 +7434,16 @@ Rules:
       target_metric: lastDrill.targetMetric,
     });
 
+    // Show drill context banner
+    const banner = document.getElementById('drillBanner');
+    const label  = document.getElementById('drillBannerLabel');
+    const goal   = document.getElementById('drillBannerGoal');
+    if (banner) {
+      label.textContent = lastDrill.title;
+      goal.textContent  = lastDrill.goal;
+      banner.style.display = 'flex';
+    }
+
     // Save snapshot for before/after comparison
     predrillSnapshot = {
       wpm: lastDiagnostics.wpm,
@@ -7576,6 +7668,17 @@ Rules:
 
   function startRetest(originalSnap, drillMeasure) {
     retestContext = { originalSnap, drillMeasure };
+
+    // Show retest context banner
+    const banner = document.getElementById('drillBanner');
+    const label  = document.getElementById('drillBannerLabel');
+    const goal   = document.getElementById('drillBannerGoal');
+    if (banner) {
+      label.textContent = 'verification retest';
+      goal.textContent  = `checking if ${originalSnap.drill.title} transferred`;
+      banner.style.display = 'flex';
+    }
+
     state.mode  = '_retest';
     state.val   = 30;
     state.words = genWords(30, { punctuation: settings.punctuation, numbers: settings.numbers });
@@ -7936,10 +8039,12 @@ Rules:
 
     document.getElementById('apbSaveBtn').addEventListener('click', () => {
       analytics.track('account_creation_started', { trigger });
-      // Open the account panel to the sign-in form
-      closeThemePanel(); closeFontPanel(); closeSyncPanel(); closeAccountPanel();
-      document.getElementById('accountBtn').click();
       banner.remove();
+      // Close any other open panels, then open the account panel
+      closeThemePanel(); closeFontPanel(); closeSyncPanel();
+      openAccountPanel();
+      // Scroll to top so the account panel dropdown is visible
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
     document.getElementById('apbSkip').addEventListener('click', () => {
