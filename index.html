@@ -4042,18 +4042,32 @@
     // drawChart needs the result panel to be visible first so the canvas
     // can measure its actual rendered width — defer one frame after show.
 
+    // ---- validity check ----
+    // Tests that don't meet minimum thresholds are shown but not recorded.
+    const wordsTyped = state.typed.trim().split(/\s+/).filter(w => w.length > 0).length;
+    const rawElapsed = (state.endTime - state.startTime) / 1000;
+    let invalidReason = null;
+    if (rawElapsed < 4)         invalidReason = 'too short to record';
+    else if (wordsTyped < 5)    invalidReason = 'too few words typed';
+    else if (wpm < 1)           invalidReason = 'no valid keystrokes';
+    else if (state.mode === 'time' && rawElapsed < state.val * 0.25)
+                                invalidReason = 'stopped too early';
+    const isValid = !invalidReason;
+
     // ---- personal best handling ----
     const key = bestKeyFor(state.mode, state.val);
     const prior = bests[key];
-    const isNewBest = !prior || wpm > prior.wpm;
+    const isNewBest = isValid && (!prior || wpm > prior.wpm);
 
     bestFlag.classList.toggle('show', isNewBest && wpm > 0);
-    if (!isNewBest && prior) {
+    if (!isNewBest && prior && isValid) {
       const parts = key.split(':');
       const modSuffix = parts.length > 2 ? ` (${MODIFIER_LABELS[parts.slice(2).join(':')] || parts.slice(2).join(':')})` : '';
       prevBest.innerHTML = `personal best${modSuffix}: <b>${prior.wpm}</b> wpm`;
     } else {
-      prevBest.textContent = '';
+      prevBest.textContent = invalidReason
+        ? `<span style="font-size:11px;color:var(--ink-faint)">${invalidReason}</span>`
+        : '';
     }
 
     if (isNewBest && wpm > 0) {
@@ -4062,8 +4076,6 @@
       if (ghostTimestamps.length > 0) {
         saveGhost({ timestamps: ghostTimestamps, wpm, key, mode: state.mode, val: state.val });
       }
-      // Submit to global leaderboard if signed in with a username
-      // Only for clean standard modes (no modifiers like punct/nums/code)
       const cleanModes = ['time:15','time:30','time:60','words:25','words:50'];
       if (authSession && currentUsername && cleanModes.includes(key)) {
         submitLeaderboardScore(key, wpm, accClamped).catch(() => {});
@@ -4072,32 +4084,29 @@
     refreshBestBadge();
 
     // ---- daily challenge tracking ----
-    if (state.mode === 'daily') {
+    if (isValid && state.mode === 'daily') {
       recordDailyComplete(wpm, accClamped);
     }
 
     // ---- history ----
-    // Store rounded timestamps for recent runs so the perf page can
-    // replay any test. Round to nearest 10ms (enough precision for replay,
-    // cuts storage size ~3x vs raw float timestamps).
-    const roundedTimestamps = ghostTimestamps.length > 0
-      ? ghostTimestamps.map(t => Math.round(t / 10) * 10)
-      : null;
-
-    history.unshift({
-      key, mode: state.mode, val: state.val,
-      wpm, acc: accClamped, raw, time: Math.round(elapsedSec),
-      chars: state.typed.length, date: Date.now(),
-      ts: roundedTimestamps,          // per-character timestamps for replay
-      words: state.words.slice(),     // the exact words used in this test
-    });
-    // Keep full detail only for the 50 most recent runs to manage storage
-    history = history.map((h, i) => {
-      if (i >= 50) { const { ts, words, ...rest } = h; return rest; }
-      return h;
-    });
-    history = history.slice(0, 500);
-    saveJSON(HISTORY_KEY, history);
+    if (isValid) {
+      const roundedTimestamps = ghostTimestamps.length > 0
+        ? ghostTimestamps.map(t => Math.round(t / 10) * 10)
+        : null;
+      history.unshift({
+        key, mode: state.mode, val: state.val,
+        wpm, acc: accClamped, raw, time: Math.round(elapsedSec),
+        chars: state.typed.length, date: Date.now(),
+        ts: roundedTimestamps,
+        words: state.words.slice(),
+      });
+      history = history.map((h, i) => {
+        if (i >= 50) { const { ts, words, ...rest } = h; return rest; }
+        return h;
+      });
+      history = history.slice(0, 500);
+      saveJSON(HISTORY_KEY, history);
+    }
     renderHistory();
 
     // ---- save for share card ----
@@ -4139,9 +4148,7 @@
     generateAutoInsight(wpm, accClamped, raw);
 
     // ---- account prompt for new/anonymous users ----
-    // Show after the first test so users have experienced value before being asked
-    if (!authSession) {
-      // Small delay so it appears after the AI insight loads
+    if (!authSession && isValid) {
       setTimeout(() => showAccountPrompt('post_test'), 1200);
     }
 
