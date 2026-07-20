@@ -1269,7 +1269,18 @@
     animation: caretblink 1s steps(1) infinite;
   }
 
-  /* ---------- session progress bar ---------- */
+  .invalid-notice {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: 4px;
+  }
+  .invalid-notice svg { flex-shrink: 0; color: var(--ink-faint); }
+
+
   .session-progress {
     display: flex;
     align-items: center;
@@ -3541,6 +3552,7 @@
     if (oldDrillCta) oldDrillCta.remove();
     const oldDrillComp = document.getElementById('drillComparison');
     if (oldDrillComp) oldDrillComp.remove();
+    document.getElementById('invalidNotice')?.remove();
     stage.style.display = 'flex';
     restartRow.classList.remove('hide');
     field.classList.remove('blurred');
@@ -4033,26 +4045,56 @@
     const acc = state.keystrokes === 0 ? 100 : Math.round((state.correctKeystrokes / state.keystrokes) * 100);
     const accClamped = Math.max(0, Math.min(100, acc));
 
+    // ---- validity check — must happen before any UI or data writes ----
+    const wordsTyped = state.typed.trim().split(/\s+/).filter(w => w.length > 0).length;
+    const rawElapsed = (state.endTime - state.startTime) / 1000;
+    let invalidReason = null;
+    if (rawElapsed < 4)      invalidReason = 'too short to record';
+    else if (wordsTyped < 5) invalidReason = 'too few words typed';
+    else if (wpm < 1)        invalidReason = 'no valid keystrokes';
+    else if (state.mode === 'time' && rawElapsed < state.val * 0.25)
+                             invalidReason = 'stopped too early';
+    const isValid = !invalidReason;
+
+    // Invalid tests show results but don't save anything — notify the user why
+    if (!isValid) {
+      document.getElementById('resWpm').textContent = wpm;
+      document.getElementById('resAcc').innerHTML = accClamped + '<small>%</small>';
+      document.getElementById('resRaw').textContent = raw;
+      document.getElementById('resChars').textContent = state.typed.length;
+      document.getElementById('resTime').textContent = Math.round(elapsedSec) + 's';
+
+      stage.style.display = 'none';
+      restartRow.classList.add('hide');
+      result.classList.add('show');
+      coachFab.classList.add('visible');
+      document.getElementById('dailyComparison').classList.remove('show');
+      document.getElementById('dailyLeaderboard').classList.remove('show');
+      bestFlag.classList.remove('show');
+      prevBest.textContent = '';
+
+      // Show invalidation notice where the personal best line normally sits
+      const notice = document.createElement('div');
+      notice.className = 'invalid-notice';
+      notice.innerHTML = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        result not saved — ${invalidReason}
+      `;
+      // Remove any previous notice
+      document.getElementById('invalidNotice')?.remove();
+      notice.id = 'invalidNotice';
+      prevBest.after(notice);
+
+      requestAnimationFrame(() => drawChart());
+      renderHistory();
+      return;
+    }
+
     document.getElementById('resWpm').textContent = wpm;
     document.getElementById('resAcc').innerHTML = accClamped + '<small>%</small>';
     document.getElementById('resRaw').textContent = raw;
     document.getElementById('resChars').textContent = state.typed.length;
     document.getElementById('resTime').textContent = Math.round(elapsedSec) + 's';
-
-    // drawChart needs the result panel to be visible first so the canvas
-    // can measure its actual rendered width — defer one frame after show.
-
-    // ---- validity check ----
-    // Tests that don't meet minimum thresholds are shown but not recorded.
-    const wordsTyped = state.typed.trim().split(/\s+/).filter(w => w.length > 0).length;
-    const rawElapsed = (state.endTime - state.startTime) / 1000;
-    let invalidReason = null;
-    if (rawElapsed < 4)         invalidReason = 'too short to record';
-    else if (wordsTyped < 5)    invalidReason = 'too few words typed';
-    else if (wpm < 1)           invalidReason = 'no valid keystrokes';
-    else if (state.mode === 'time' && rawElapsed < state.val * 0.25)
-                                invalidReason = 'stopped too early';
-    const isValid = !invalidReason;
 
     // ---- personal best handling ----
     const key = bestKeyFor(state.mode, state.val);
@@ -4060,14 +4102,12 @@
     const isNewBest = isValid && (!prior || wpm > prior.wpm);
 
     bestFlag.classList.toggle('show', isNewBest && wpm > 0);
-    if (!isNewBest && prior && isValid) {
+    if (!isNewBest && prior) {
       const parts = key.split(':');
       const modSuffix = parts.length > 2 ? ` (${MODIFIER_LABELS[parts.slice(2).join(':')] || parts.slice(2).join(':')})` : '';
       prevBest.innerHTML = `personal best${modSuffix}: <b>${prior.wpm}</b> wpm`;
     } else {
-      prevBest.textContent = invalidReason
-        ? `<span style="font-size:11px;color:var(--ink-faint)">${invalidReason}</span>`
-        : '';
+      prevBest.textContent = '';
     }
 
     if (isNewBest && wpm > 0) {
