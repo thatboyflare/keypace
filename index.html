@@ -1312,11 +1312,10 @@
   }
   .apb-inner {
     display: flex;
-    align-items: flex-start;
-    gap: 16px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 12px;
   }
-  .apb-text { flex: 1; min-width: 160px; }
+  .apb-text { }
   .apb-title {
     font-family: var(--font-ui);
     font-size: 13px;
@@ -1330,13 +1329,13 @@
     color: var(--ink-dim);
     line-height: 1.5;
   }
-  .apb-actions {
+  .apb-form {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
+    flex-direction: column;
+    gap: 8px;
   }
-  .apb-save-btn { font-size: 12px; padding: 8px 16px; }
+  .apb-email { width: 100%; }
+  .apb-save-btn { align-self: flex-start; font-size: 13px; padding: 9px 18px; }
   .apb-skip {
     font-family: var(--font-ui);
     font-size: 11px;
@@ -1345,6 +1344,7 @@
     background: none;
     border: none;
     padding: 0;
+    align-self: flex-start;
   }
   .apb-skip:hover { color: var(--ink-dim); }
 
@@ -4077,6 +4077,13 @@
 
     // ---- auto insight ----
     generateAutoInsight(wpm, accClamped, raw);
+
+    // ---- account prompt for new/anonymous users ----
+    // Show after the first test so users have experienced value before being asked
+    if (!authSession) {
+      // Small delay so it appears after the AI insight loads
+      setTimeout(() => showAccountPrompt('post_test'), 1200);
+    }
 
     // Auto-push updated stats if signed in
     if (authSession) pushStats().catch(() => {});
@@ -7964,7 +7971,6 @@ Rules:
   const ACCOUNT_PROMPT_KEY = 'keypace_account_prompt_v1'; // flag so we only show it once
 
   const isNewUser = !localStorage.getItem(HINT_KEY);
-  const isSignedIn = !!authSession;
 
   function dismissHint() {
     if (!hintOverlay || hintOverlay.classList.contains('gone')) return;
@@ -7994,7 +8000,7 @@ Rules:
     const step = (() => {
       try { return localStorage.getItem(SESSION_STEP_KEY) || 'baseline'; } catch { return 'baseline'; }
     })();
-    if (step === 'done' || isSignedIn) {
+    if (step === 'done' || !!authSession) {
       const bar = document.getElementById('sessionProgress');
       if (bar) bar.style.display = 'none';
       return;
@@ -8006,15 +8012,11 @@ Rules:
   const ACCOUNT_PROMPT_TRIGGER_COUNT = 1; // show after the first eligible trigger
 
   function showAccountPrompt(trigger) {
-    // Never show if already signed in or already shown
     if (authSession) return;
-    try { if (localStorage.getItem(ACCOUNT_PROMPT_KEY)) return; } catch {}
+    // Only show once per browser session (not just once ever — reset on sign-out)
+    if (document.getElementById('accountPromptBanner')) return;
 
     analytics.track('account_prompt_displayed', { trigger });
-    try { localStorage.setItem(ACCOUNT_PROMPT_KEY, '1'); } catch {}
-
-    const existing = document.getElementById('accountPromptBanner');
-    if (existing) return;
 
     const banner = document.createElement('div');
     banner.id = 'accountPromptBanner';
@@ -8023,28 +8025,49 @@ Rules:
       <div class="apb-inner">
         <div class="apb-text">
           <div class="apb-title">save your typing profile</div>
-          <div class="apb-body">keep your diagnoses, drills, and personal bests synced across devices.</div>
+          <div class="apb-body">enter your email — we'll send a magic link. no password needed.</div>
         </div>
-        <div class="apb-actions">
+        <div class="apb-form" id="apbForm">
+          <input type="email" class="sync-code-input apb-email" id="apbEmail"
+            placeholder="you@example.com" autocomplete="email" />
           <button class="btn primary apb-save-btn" id="apbSaveBtn">save my progress</button>
-          <button class="btn-text apb-skip" id="apbSkip">not now</button>
+          <div class="sync-result" id="apbResult"></div>
         </div>
+        <button class="apb-skip" id="apbSkip">not now</button>
       </div>
     `;
 
-    // Insert after result-actions
     const resultActions = result.querySelector('.result-actions');
     if (resultActions) result.insertBefore(banner, resultActions.nextSibling);
     else result.appendChild(banner);
 
-    document.getElementById('apbSaveBtn').addEventListener('click', () => {
+    // Send magic link directly from here
+    document.getElementById('apbSaveBtn').addEventListener('click', async () => {
+      const email  = document.getElementById('apbEmail').value.trim();
+      const res    = document.getElementById('apbResult');
+      if (!email || !email.includes('@')) {
+        res.textContent = 'enter a valid email address.';
+        res.className   = 'sync-result show error';
+        return;
+      }
+      document.getElementById('apbSaveBtn').disabled = true;
+      res.textContent = 'sending…';
+      res.className   = 'sync-result show loading';
       analytics.track('account_creation_started', { trigger });
-      banner.remove();
-      // Close any other open panels, then open the account panel
-      closeThemePanel(); closeFontPanel(); closeSyncPanel();
-      openAccountPanel();
-      // Scroll to top so the account panel dropdown is visible
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      try {
+        await sendMagicLink(email);
+        res.textContent = `magic link sent to ${email} — check your inbox.`;
+        res.className   = 'sync-result show success';
+        document.getElementById('apbForm').querySelector('input').disabled = true;
+      } catch (e) {
+        res.textContent = e.message || 'something went wrong — try again.';
+        res.className   = 'sync-result show error';
+        document.getElementById('apbSaveBtn').disabled = false;
+      }
+    });
+
+    document.getElementById('apbEmail').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('apbSaveBtn').click();
     });
 
     document.getElementById('apbSkip').addEventListener('click', () => {
