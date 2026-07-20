@@ -1302,40 +1302,87 @@
     opacity: 0.5;
   }
 
-  /* ---------- account prompt banner ---------- */
+  /* ---------- account prompt popup ---------- */
+  @keyframes apb-slide-up {
+    from { opacity: 0; transform: translateY(24px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+  }
+  @keyframes apb-pulse-border {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(232,179,57,0); }
+    50%       { box-shadow: 0 0 0 4px rgba(232,179,57,0.15); }
+  }
+
   .account-prompt-banner {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 200;
+    width: 320px;
     background: var(--panel);
     border: 1px solid var(--accent-dim);
-    border-radius: var(--radius);
-    padding: 16px 18px;
-    animation: rise 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: 16px;
+    padding: 20px 20px 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px var(--accent-dim);
+    animation: apb-slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+               apb-pulse-border 2s ease-in-out 0.6s 2;
   }
-  .apb-inner {
+  @media (max-width: 600px) {
+    .account-prompt-banner {
+      bottom: 0; right: 0; left: 0; width: 100%;
+      border-radius: 16px 16px 0 0;
+      border-bottom: none;
+    }
+  }
+  .apb-header {
     display: flex;
-    flex-direction: column;
-    gap: 12px;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
   }
-  .apb-text { }
+  .apb-icon {
+    width: 32px; height: 32px;
+    background: var(--accent-wash);
+    border: 1px solid var(--accent-dim);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent);
+    flex-shrink: 0;
+    margin-bottom: 10px;
+  }
+  .apb-close {
+    background: none; border: none;
+    color: var(--ink-faint); cursor: pointer;
+    font-size: 18px; line-height: 1;
+    padding: 0; margin-left: auto;
+    transition: color 0.15s;
+  }
+  .apb-close:hover { color: var(--ink); }
   .apb-title {
     font-family: var(--font-ui);
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 700;
     color: var(--ink);
-    margin-bottom: 3px;
+    margin-bottom: 4px;
   }
   .apb-body {
     font-family: var(--font-ui);
     font-size: 12px;
     color: var(--ink-dim);
-    line-height: 1.5;
+    line-height: 1.55;
+    margin-bottom: 14px;
   }
   .apb-form {
     display: flex;
     flex-direction: column;
     gap: 8px;
   }
-  .apb-email { width: 100%; }
-  .apb-save-btn { align-self: flex-start; font-size: 13px; padding: 9px 18px; }
+  .apb-email { width: 100%; font-size: 13px; }
+  .apb-save-btn {
+    width: 100%;
+    justify-content: center;
+    font-size: 13px;
+    padding: 10px;
+  }
   .apb-skip {
     font-family: var(--font-ui);
     font-size: 11px;
@@ -1343,10 +1390,23 @@
     cursor: pointer;
     background: none;
     border: none;
-    padding: 0;
-    align-self: flex-start;
+    padding: 4px 0 0;
+    text-align: center;
+    width: 100%;
+    transition: color 0.15s;
   }
   .apb-skip:hover { color: var(--ink-dim); }
+
+  /* subtle attention-getter dot on the icon */
+  .apb-dot {
+    width: 7px; height: 7px;
+    background: var(--accent);
+    border-radius: 50%;
+    position: absolute;
+    top: -2px; right: -2px;
+    box-shadow: 0 0 6px var(--accent);
+    animation: caretblink 1.4s ease-in-out infinite;
+  }
 
   /* ---------- drill CTA ---------- */
   .drill-cta {
@@ -8022,24 +8082,26 @@ Rules:
     banner.id = 'accountPromptBanner';
     banner.className = 'account-prompt-banner';
     banner.innerHTML = `
-      <div class="apb-inner">
-        <div class="apb-text">
-          <div class="apb-title">save your typing profile</div>
-          <div class="apb-body">enter your email — we'll send a magic link. no password needed.</div>
+      <div style="position:relative;display:inline-block;margin-bottom:10px;">
+        <div class="apb-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
         </div>
-        <div class="apb-form" id="apbForm">
-          <input type="email" class="sync-code-input apb-email" id="apbEmail"
-            placeholder="you@example.com" autocomplete="email" />
-          <button class="btn primary apb-save-btn" id="apbSaveBtn">save my progress</button>
-          <div class="sync-result" id="apbResult"></div>
-        </div>
-        <button class="apb-skip" id="apbSkip">not now</button>
+        <div class="apb-dot"></div>
+      </div>
+      <button class="apb-close" id="apbSkip" aria-label="Dismiss">×</button>
+      <div class="apb-title">save your typing profile</div>
+      <div class="apb-body">keep your diagnoses, drills, and personal bests synced across all your devices. no password needed.</div>
+      <div class="apb-form" id="apbForm">
+        <input type="email" class="sync-code-input apb-email" id="apbEmail"
+          placeholder="your@email.com" autocomplete="email" />
+        <button class="btn primary apb-save-btn" id="apbSaveBtn">save my progress →</button>
+        <div class="sync-result" id="apbResult"></div>
+        <button class="apb-skip" id="apbSkipBottom">maybe later</button>
       </div>
     `;
 
-    const resultActions = result.querySelector('.result-actions');
-    if (resultActions) result.insertBefore(banner, resultActions.nextSibling);
-    else result.appendChild(banner);
+    // Fixed popup — append to body not result panel
+    document.body.appendChild(banner);
 
     // Send magic link directly from here
     document.getElementById('apbSaveBtn').addEventListener('click', async () => {
@@ -8070,9 +8132,8 @@ Rules:
       if (e.key === 'Enter') document.getElementById('apbSaveBtn').click();
     });
 
-    document.getElementById('apbSkip').addEventListener('click', () => {
-      banner.remove();
-    });
+    document.getElementById('apbSkip').addEventListener('click', () => banner.remove());
+    document.getElementById('apbSkipBottom').addEventListener('click', () => banner.remove());
   }
 
   // Only show hint on first visit
