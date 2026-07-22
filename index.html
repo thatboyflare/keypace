@@ -2120,6 +2120,8 @@
     white-space: nowrap;
   }
   .perf-replay-btn:hover { color: var(--accent); background: var(--bg-soft); }
+  .perf-delete-btn:hover { color: #e2685f; background: var(--bg-soft); }
+  .perf-delete-btn.is-armed { color: #e2685f; background: var(--bg-soft); }
 
   /* ghost replay viewer */
   .ghost-viewer {
@@ -4113,9 +4115,6 @@
     if (isNewBest && wpm > 0) {
       bests[key] = { wpm, acc: accClamped, date: Date.now() };
       saveJSON(BESTS_KEY, bests);
-      if (ghostTimestamps.length > 0) {
-        saveGhost({ timestamps: ghostTimestamps, wpm, key, mode: state.mode, val: state.val });
-      }
       const cleanModes = ['time:15','time:30','time:60','words:25','words:50'];
       if (authSession && currentUsername && cleanModes.includes(key)) {
         submitLeaderboardScore(key, wpm, accClamped).catch(() => {});
@@ -4444,14 +4443,18 @@
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
             share
           </button>
+          <button class="perf-replay-btn perf-delete-btn" data-idx="${idx}" data-date="${h.date}" title="Delete this result">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
+            delete
+          </button>
         </td>
       `;
       tbody.appendChild(tr);
     });
 
-    // Wire up replay and share buttons
+    // Wire up replay, share, and delete buttons
     tbody.addEventListener('click', (e) => {
-      const replayBtn = e.target.closest('.perf-replay-btn:not(.perf-share-btn)');
+      const replayBtn = e.target.closest('.perf-replay-btn:not(.perf-share-btn):not(.perf-delete-btn)');
       if (replayBtn) {
         const h = history[parseInt(replayBtn.dataset.idx, 10)];
         if (h) openGhostViewer(h);
@@ -4461,8 +4464,78 @@
       if (shareBtn) {
         const h = history[parseInt(shareBtn.dataset.idx, 10)];
         if (h) openShareFromHistory(h);
+        return;
+      }
+      const deleteBtn = e.target.closest('.perf-delete-btn');
+      if (deleteBtn) {
+        if (deleteBtn.dataset.armed === '1') {
+          deleteHistoryEntry(parseInt(deleteBtn.dataset.idx, 10), deleteBtn.dataset.date);
+        } else {
+          armDeleteButton(deleteBtn, tbody);
+        }
       }
     });
+  }
+
+  // Two-step confirm: first click arms the button ("sure?"), a second click
+  // within the window deletes. Arming any other delete button, or letting
+  // the window lapse, disarms it again.
+  function armDeleteButton(btn, scope) {
+    scope.querySelectorAll('.perf-delete-btn.is-armed').forEach(b => disarmDeleteButton(b));
+    btn.classList.add('is-armed');
+    btn.dataset.armed = '1';
+    btn.innerHTML = `
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+      sure?
+    `;
+    btn._armTimeout = setTimeout(() => disarmDeleteButton(btn), 3000);
+  }
+
+  function disarmDeleteButton(btn) {
+    clearTimeout(btn._armTimeout);
+    btn.classList.remove('is-armed');
+    btn.dataset.armed = '0';
+    btn.innerHTML = `
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
+      delete
+    `;
+  }
+
+  function deleteHistoryEntry(idx, dateStr) {
+    // Look up by date rather than trusting idx blindly, in case the array
+    // shifted between render and click (defensive, cheap to check).
+    const date = parseInt(dateStr, 10);
+    let target = idx;
+    if (!history[target] || history[target].date !== date) {
+      target = history.findIndex(h => h.date === date);
+    }
+    if (target < 0 || !history[target]) return;
+
+    const entry = history[target];
+    history.splice(target, 1);
+    saveJSON(HISTORY_KEY, history);
+
+    // If the deleted run was the current personal best for its key,
+    // re-promote the next-highest remaining run for that key (or clear
+    // the best entirely if none remain).
+    const key = entry.key;
+    if (bests[key] && bests[key].date === entry.date) {
+      const remaining = history.filter(h => h.key === key);
+      if (remaining.length) {
+        const next = remaining.reduce((a, b) => (b.wpm > a.wpm ? b : a));
+        bests[key] = { wpm: next.wpm, acc: next.acc, date: next.date };
+      } else {
+        delete bests[key];
+      }
+      saveJSON(BESTS_KEY, bests);
+      refreshBestBadge();
+    }
+
+    renderHistory();
+    refreshPerfPage();
+
+    // Sync the deletion to the cloud if signed in.
+    if (authSession) pushStats().catch(() => {});
   }
 
   function refreshPerfPage() {
@@ -4649,6 +4722,7 @@
     renderHistory();
     refreshBestBadge();
     refreshPerfPage();
+    if (authSession) pushStats().catch(() => {});
   });
 
   function drawChart() {
@@ -6513,17 +6587,12 @@ COACHING GUIDELINES:
     return snippet.split(' ').filter(w => w.length > 0);
   }
 
-  // ---------------- ghost replay ----------------
-  // Races your personal best against you in real-time during a test.
-  // The ghost caret (faint, lives inside the same field as the typing text)
-  // ghostTimestamps records keypress timing during tests for the history
-  // replay viewer in the performance page.
-  const GHOST_KEY = 'keypace_ghost_v1';
+  // ---------------- keypress timing ----------------
+  // ghostTimestamps records ms-elapsed-since-start at each keypress during a
+  // test. Feeds runDiagnostics() and, when a test is saved, is copied into
+  // the history entry (rounded) to power the post-test replay viewer on the
+  // performance page.
   let ghostTimestamps = [];
-
-  function saveGhost(data) {
-    try { localStorage.setItem(GHOST_KEY, JSON.stringify(data)); } catch {}
-  }
 
   // ---------------- share result card ----------------
   function drawShareCard(wpm, acc, raw, mode, val, dateTs) {
