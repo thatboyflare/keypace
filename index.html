@@ -4170,11 +4170,19 @@
       document.getElementById('lbList').innerHTML = '<div class="lb-loading">loading scores…</div>';
 
       const submitPromise = authSession
-        ? submitDailyScore(wpm, accClamped).catch(() => {})
+        ? submitDailyScore(wpm, accClamped).then(() => syncStreakFromServer()).catch(() => {})
         : Promise.resolve();
 
       submitPromise.then(() => fetchLeaderboard(today)).then(rows => {
         renderLeaderboard(rows, authSession?.user?.id, today);
+        // Streak may have just been corrected by syncStreakFromServer — refresh
+        // the "N day streak" line in the daily comparison panel to match.
+        const streak = loadStreak();
+        const dc = document.getElementById('dcStreak');
+        if (dc) {
+          dc.textContent = streak.count > 1 ? `🔥 ${streak.count} day streak` :
+            streak.count === 1 ? '🔥 1 day streak' : '';
+        }
       }).catch(() => {
         document.getElementById('lbList').innerHTML = '<div class="lb-empty">Could not load scores.</div>';
       });
@@ -5695,6 +5703,7 @@
       await pullStats();
       await pushStats();
       await syncExistingBestsToLeaderboard();
+      await syncStreakFromServer();
       status.textContent = 'Signed in — stats sync automatically.';
       status.className = 'sync-result show success';
     } catch (e) {
@@ -5755,6 +5764,7 @@
     try {
       await pullStats();
       await pushStats();
+      await syncStreakFromServer();
       status.textContent = 'All synced!';
       status.className = 'sync-result show success';
     } catch (e) {
@@ -5818,6 +5828,7 @@
     pullStats().then(async () => {
       await pushStats();
       await syncExistingBestsToLeaderboard();
+      await syncStreakFromServer();
     }).catch(() => {});
   }
 
@@ -6411,6 +6422,55 @@ COACHING GUIDELINES:
     } else {
       badge.textContent = '';
     }
+  }
+
+  function toDateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  // The streak counter in localStorage (STREAK_KEY) is per-browser, so on a
+  // shared account it drifts across devices — each device only knows about
+  // days it personally completed. daily_scores in Supabase is the actual
+  // shared source of truth (one row per user per completed day), so for
+  // signed-in users we recompute the streak from there and overwrite the
+  // local cache. Anonymous users keep the local-only counter since there's
+  // no server record to derive it from.
+  async function syncStreakFromServer() {
+    if (!authSession) return;
+    let rows;
+    try {
+      const res = await authFetch(
+        `${DAILY_SCORES_URL}?user_id=eq.${authSession.user.id}&select=date&order=date.desc&limit=400`,
+        {}, true // suppressClear — background sync, don't log out on failure
+      );
+      if (!res.ok) return;
+      rows = await res.json();
+    } catch { return; }
+
+    if (!rows.length) { saveStreak({ count: 0, lastDate: '' }); updateStreakBadge(); return; }
+
+    const dates = new Set(rows.map(r => r.date));
+    const today = getDailyDateStr();
+    const yesterdayD = new Date();
+    yesterdayD.setDate(yesterdayD.getDate() - 1);
+    const yesterday = toDateStr(yesterdayD);
+
+    // A streak stays "alive" for display until a day is fully missed, so
+    // anchor the walk at today if it's done, otherwise yesterday.
+    const anchor = dates.has(today) ? today : (dates.has(yesterday) ? yesterday : null);
+    let count = 0;
+    if (anchor) {
+      const [ay, am, ad] = anchor.split('-').map(Number);
+      const cursor = new Date(ay, am - 1, ad);
+      let cur = anchor;
+      while (dates.has(cur)) {
+        count++;
+        cursor.setDate(cursor.getDate() - 1);
+        cur = toDateStr(cursor);
+      }
+    }
+    saveStreak({ count, lastDate: rows[0].date });
+    updateStreakBadge();
   }
 
   function recordDailyComplete(wpm, acc) {
