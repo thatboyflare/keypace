@@ -6320,6 +6320,42 @@ COACHING GUIDELINES:
 
     coachHistory.push({ role: 'user', content: userText });
 
+    // Streamed text arrives in bursty SSE chunks — re-rendering the whole
+    // bubble (innerHTML replace + a scrollHeight read, which forces a
+    // synchronous layout) on every single chunk is what makes streaming
+    // feel choppy. Instead, network chunks just accumulate into fullText,
+    // and a separate requestAnimationFrame loop drains it onto the screen
+    // at a steady pace — at most once per frame, and fast enough to fully
+    // catch up within a couple of frames — so bursts get smoothed into a
+    // consistent flow instead of a pile of back-to-back reflows.
+    let fullText = '';
+    let revealedText = '';
+    let networkDone = false;
+    let cancelled = false;
+
+    function renderBubble(text) {
+      bubble.innerHTML = renderMarkdown(text.replace(DRILL_MARKER, '').trim());
+      coachMessages.scrollTop = coachMessages.scrollHeight;
+    }
+
+    const revealDone = new Promise((resolve) => {
+      function step() {
+        if (cancelled) { resolve(); return; }
+        const backlog = fullText.length - revealedText.length;
+        if (backlog > 0) {
+          const take = Math.max(3, Math.ceil(backlog / 4));
+          revealedText = fullText.slice(0, revealedText.length + take);
+          renderBubble(revealedText);
+        }
+        if (!cancelled && (revealedText.length < fullText.length || !networkDone)) {
+          requestAnimationFrame(step);
+        } else {
+          resolve();
+        }
+      }
+      requestAnimationFrame(step);
+    });
+
     try {
       const res = await fetch('https://keypace-coach.keypace-coach.workers.dev', {
         method: 'POST',
@@ -6340,7 +6376,6 @@ COACHING GUIDELINES:
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let fullText = '';
       bubble.innerHTML = '';
 
       while (true) {
@@ -6354,25 +6389,25 @@ COACHING GUIDELINES:
           try {
             const parsed = JSON.parse(data);
             const delta = parsed.delta?.text || '';
-            if (delta) {
-              fullText += delta;
-              bubble.innerHTML = renderMarkdown(fullText.replace(DRILL_MARKER, '').trim());
-              coachMessages.scrollTop = coachMessages.scrollHeight;
-            }
+            if (delta) fullText += delta;
           } catch (e) { /* skip malformed SSE lines */ }
         }
       }
+      networkDone = true;
+
+      // Let the on-screen reveal catch up to the fully-received text before
+      // moving on — so the drill CTA (if any) never appears mid-typewriter.
+      await revealDone;
 
       coachHistory.push({ role: 'assistant', content: fullText });
 
       // If the coach offered a tailored drill — either it emitted the marker,
       // or the user's own message clearly asked about a weakness/practice —
-      // strip the marker from what's displayed and attach a real CTA. The
-      // drill itself is always built fresh from real diagnostic data, never
-      // from anything the model wrote.
+      // attach a real CTA. The drill itself is always built fresh from real
+      // diagnostic data, never from anything the model wrote.
       const wantsDrill = fullText.includes(DRILL_MARKER) || DRILL_INTENT_PATTERN.test(userText);
       if (wantsDrill) {
-        bubble.innerHTML = renderMarkdown(fullText.replace(DRILL_MARKER, '').trim());
+        renderBubble(fullText);
         const diagSource = getCoachDiagnosticSource();
         if (diagSource) {
           appendDrillCTAToChat(assistantDiv, generateDrill(diagSource), diagSource);
@@ -6389,6 +6424,7 @@ COACHING GUIDELINES:
       }
 
     } catch (err) {
+      cancelled = true; // let the reveal loop stop rather than spin forever
       bubble.innerHTML = `<p style="color:var(--error)">Something went wrong: ${err.message}. Try again in a moment.</p>`;
       // Remove the failed message from history so the conversation stays clean
       coachHistory.pop();
