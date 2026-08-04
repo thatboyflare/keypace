@@ -17,9 +17,39 @@
 <meta name="twitter:title"       content="Keypace — AI Typing Coach and Speed Test" />
 <meta name="twitter:description" content="Every typing test should teach you something. Keypace analyzes your speed, accuracy, and mistakes — then builds a personalized practice drill." />
 <meta name="twitter:image"       content="https://keypace.io/og.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <script>
   // Set theme + font attributes as early as possible, before CSS/paint, so
   // there's no flash of the fallback look on load for returning visitors.
+  //
+  // Font loading: the critical, render-blocking Google Fonts request below
+  // only asks for Inter (UI chrome, always needed) plus whichever ONE mono
+  // font is actually saved for this visitor — not all 13 available fonts.
+  // Blocking page load on every font family regardless of which one is
+  // selected was pure wasted bandwidth for every visitor, and widened the
+  // window before document.fonts.ready resolves (see the font-change
+  // listener further down, which recalculates cached caret/line metrics
+  // once fonts settle) — a slower, more variable font load made it more
+  // likely someone starts typing before that settles, causing a visible
+  // mid-test layout correction. The other font families are lazy-loaded
+  // only if/when the font picker is actually opened.
+  var FONT_FAMILY_QUERY = {
+    jetbrains: 'JetBrains+Mono:wght@400;500;600;700',
+    firacode: 'Fira+Code:wght@400;500;600;700',
+    ibmplex: 'IBM+Plex+Mono:wght@400;500;600;700',
+    spacemono: 'Space+Mono:wght@400;700',
+    sourcecodepro: 'Source+Code+Pro:wght@400;500;600;700',
+    robotomono: 'Roboto+Mono:wght@400;500;700',
+    courierprime: 'Courier+Prime:wght@400;700',
+    inconsolata: 'Inconsolata:wght@400;500;600;700',
+    ubuntumono: 'Ubuntu+Mono:wght@400;700',
+    anonymouspro: 'Anonymous+Pro:wght@400;700',
+    ptmono: 'PT+Mono',
+    overpassmono: 'Overpass+Mono:wght@300;400;600;700',
+    dmmono: 'DM+Mono:wght@300;400;500',
+  };
+  var savedFontId = 'jetbrains';
   (function () {
     try {
       var savedTheme = localStorage.getItem('keypace_theme_v1');
@@ -29,15 +59,15 @@
     }
     try {
       var savedFont = localStorage.getItem('keypace_font_v1');
-      document.documentElement.setAttribute('data-font', savedFont || 'jetbrains');
+      if (savedFont && FONT_FAMILY_QUERY[savedFont]) savedFontId = savedFont;
+      document.documentElement.setAttribute('data-font', savedFontId);
     } catch (e) {
       document.documentElement.setAttribute('data-font', 'jetbrains');
     }
+    var criticalQuery = 'Inter:wght@400;500;600;700&family=' + FONT_FAMILY_QUERY[savedFontId];
+    document.write('<link href="https://fonts.googleapis.com/css2?family=' + criticalQuery + '&display=swap" rel="stylesheet">');
   })();
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Source+Code+Pro:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&family=Courier+Prime:wght@400;700&family=Inconsolata:wght@400;500;600;700&family=Ubuntu+Mono:wght@400;700&family=Anonymous+Pro:wght@400;700&family=PT+Mono&family=Overpass+Mono:wght@300;400;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
     --radius: 10px;
@@ -5237,7 +5267,26 @@
   const fontBtn = document.getElementById('fontBtn');
   const fontPanel = document.getElementById('fontPanel');
 
+  // The critical <head> script already loaded Inter + whichever one font is
+  // actually saved for this visitor. The other font families are only
+  // fetched the first time someone actually opens the picker to browse —
+  // no reason to make every page load pay for fonts most visitors will
+  // never look at.
+  let extraFontsLoaded = false;
+  function loadRemainingFonts() {
+    if (extraFontsLoaded) return;
+    extraFontsLoaded = true;
+    const remaining = Object.keys(FONT_FAMILY_QUERY).filter(id => id !== savedFontId);
+    if (!remaining.length) return;
+    const query = remaining.map(id => 'family=' + FONT_FAMILY_QUERY[id]).join('&');
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?${query}&display=swap`;
+    document.head.appendChild(link);
+  }
+
   function openFontPanel() {
+    loadRemainingFonts();
     renderFontList();
     fontPanel.classList.add('show');
   }
