@@ -5477,8 +5477,26 @@
   // listener further down already owns Tab-to-restart, and handling it in
   // both places would run buildTest() twice per press (this listener fires
   // first as the event target, then bubbles to the document listener).
+  //
+  // FAST PATH for physical keyboards: handle printable characters and
+  // Backspace directly on keydown instead of waiting for the `input`
+  // listener below. `input` only fires after the browser has already run
+  // its full native text-editing pipeline on mobileInput — inserting the
+  // character, moving the native cursor, etc. — which adds real, felt
+  // latency at typing speed (at 120+ WPM the gap between keystrokes is
+  // already under 100ms, so even a few extra ms per key is perceptible).
+  // handleKey() calls e.preventDefault() internally for these keys, which
+  // stops the browser from ever writing into mobileInput.value — so the
+  // `input` listener below simply never fires for a keystroke handled here,
+  // meaning no double-counting. Mobile virtual keyboards (IME, predictive
+  // text, swipe, voice) mostly don't fire a real keydown with a single
+  // printable e.key for character entry in the first place, so they fall
+  // through this untouched and are still handled entirely by `input`, same
+  // as before — this is purely additive for physical keyboards.
   mobileInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') handleKey(e);
+    if (e.key === 'Escape') { handleKey(e); return; }
+    if (e.key === 'Backspace') { handleKey(e); return; }
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) { handleKey(e); }
   });
 
   field.addEventListener('blur', () => {
