@@ -37,7 +37,7 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Source+Code+Pro:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Source+Code+Pro:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&family=Courier+Prime:wght@400;700&family=Inconsolata:wght@400;500;600;700&family=Ubuntu+Mono:wght@400;700&family=Anonymous+Pro:wght@400;700&family=PT+Mono&family=Overpass+Mono:wght@300;400;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
     --radius: 10px;
@@ -195,6 +195,132 @@
     --good: #5c8a5c;
   }
 
+  html[data-theme="dracula"] {
+    --bg: #282a36;
+    --bg-soft: #2f3241;
+    --panel: #343746;
+    --border: #44475a;
+    --ink: #f8f8f2;
+    --ink-dim: #7970a9;
+    --ink-faint: #6272a4;
+    --accent: #bd93f9;
+    --accent-hover: #cba8fb;
+    --accent-dim: #3d3158;
+    --accent-glow: rgba(189, 147, 249, 0.5);
+    --accent-wash: rgba(189, 147, 249, 0.06);
+    --error: #ff5555;
+    --error-dim: #4a2a2a;
+    --good: #50fa7b;
+  }
+
+  html[data-theme="gruvbox"] {
+    --bg: #282828;
+    --bg-soft: #2f2e2b;
+    --panel: #32302f;
+    --border: #3c3836;
+    --ink: #ebdbb2;
+    --ink-dim: #a89a84;
+    --ink-faint: #7c6f57;
+    --accent: #fe8019;
+    --accent-hover: #fe9a3c;
+    --accent-dim: #4a3221;
+    --accent-glow: rgba(254, 128, 25, 0.5);
+    --accent-wash: rgba(254, 128, 25, 0.06);
+    --error: #fb4934;
+    --error-dim: #4a2c28;
+    --good: #b8bb26;
+  }
+
+  html[data-theme="solarized-dark"] {
+    --bg: #002b36;
+    --bg-soft: #073642;
+    --panel: #0a3f4d;
+    --border: #0d4b5a;
+    --ink: #93a1a1;
+    --ink-dim: #5f7b7f;
+    --ink-faint: #486a6f;
+    --accent: #2aa198;
+    --accent-hover: #3fc0b5;
+    --accent-dim: #0f3a3f;
+    --accent-glow: rgba(42, 161, 152, 0.5);
+    --accent-wash: rgba(42, 161, 152, 0.06);
+    --error: #dc322f;
+    --error-dim: #4a2622;
+    --good: #859900;
+  }
+
+  html[data-theme="catppuccin"] {
+    --bg: #1e1e2e;
+    --bg-soft: #23233a;
+    --panel: #282840;
+    --border: #313244;
+    --ink: #cdd6f4;
+    --ink-dim: #8087a8;
+    --ink-faint: #6c7086;
+    --accent: #cba6f7;
+    --accent-hover: #d8b9f9;
+    --accent-dim: #443a5c;
+    --accent-glow: rgba(203, 166, 247, 0.5);
+    --accent-wash: rgba(203, 166, 247, 0.06);
+    --error: #f38ba8;
+    --error-dim: #4a2c38;
+    --good: #a6e3a1;
+  }
+
+  html[data-theme="monokai"] {
+    --bg: #272822;
+    --bg-soft: #2d2e27;
+    --panel: #33342b;
+    --border: #3e3d32;
+    --ink: #f8f8f2;
+    --ink-dim: #93917f;
+    --ink-faint: #75715e;
+    --accent: #a6e22e;
+    --accent-hover: #b8ec4f;
+    --accent-dim: #3a4520;
+    --accent-glow: rgba(166, 226, 46, 0.5);
+    --accent-wash: rgba(166, 226, 46, 0.06);
+    --error: #f92672;
+    --error-dim: #4a2530;
+    --good: #66d9ef;
+  }
+
+  html[data-theme="everforest"] {
+    --bg: #2b3339;
+    --bg-soft: #313a40;
+    --panel: #363f45;
+    --border: #414b4f;
+    --ink: #d3c6aa;
+    --ink-dim: #8a9490;
+    --ink-faint: #7a8478;
+    --accent: #a7c080;
+    --accent-hover: #b8cf95;
+    --accent-dim: #3c4a37;
+    --accent-glow: rgba(167, 192, 128, 0.5);
+    --accent-wash: rgba(167, 192, 128, 0.06);
+    --error: #e67e80;
+    --error-dim: #4a3030;
+    --good: #83c092;
+  }
+
+  html[data-theme="solarized-light"] {
+    --bg: #fdf6e3;
+    --bg-soft: #f5eed6;
+    --panel: #fffcf2;
+    --border: #e4dcc3;
+    --ink: #586e75;
+    --ink-dim: #839496;
+    --ink-faint: #b8ad8e;
+    --accent: #2aa198;
+    --accent-hover: #238b83;
+    --accent-dim: #d8ecea;
+    --accent-glow: rgba(42, 161, 152, 0.35);
+    --accent-wash: rgba(42, 161, 152, 0.08);
+    --error: #dc322f;
+    --error-dim: #f5d6d5;
+    --good: #859900;
+  }
+
   /* ---------- fonts ----------
      Only --font-mono (the typing text itself) changes per selection —
      --font-ui stays Inter throughout, since the chrome/labels/buttons
@@ -206,6 +332,12 @@
   html[data-font="sourcecodepro"] { --font-mono: 'Source Code Pro', 'SF Mono', Consolas, monospace; }
   html[data-font="robotomono"] { --font-mono: 'Roboto Mono', 'SF Mono', Consolas, monospace; }
   html[data-font="courierprime"] { --font-mono: 'Courier Prime', 'Courier New', monospace; }
+  html[data-font="inconsolata"] { --font-mono: 'Inconsolata', 'SF Mono', Consolas, monospace; }
+  html[data-font="ubuntumono"] { --font-mono: 'Ubuntu Mono', 'SF Mono', Consolas, monospace; }
+  html[data-font="anonymouspro"] { --font-mono: 'Anonymous Pro', 'SF Mono', Consolas, monospace; }
+  html[data-font="ptmono"] { --font-mono: 'PT Mono', 'SF Mono', Consolas, monospace; }
+  html[data-font="overpassmono"] { --font-mono: 'Overpass Mono', 'SF Mono', Consolas, monospace; }
+  html[data-font="dmmono"] { --font-mono: 'DM Mono', 'SF Mono', Consolas, monospace; }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -4948,6 +5080,13 @@
     { id: 'mono', label: 'Mono', dots: ['#161616', '#f2f2f2', '#e8e8e8'] },
     { id: 'sunset', label: 'Sunset', dots: ['#1c1412', '#e8845c', '#f0ddd2'] },
     { id: 'paper', label: 'Paper', dots: ['#f4f1ea', '#c2762f', '#2b2620'] },
+    { id: 'dracula', label: 'Dracula', dots: ['#282a36', '#bd93f9', '#f8f8f2'] },
+    { id: 'gruvbox', label: 'Gruvbox', dots: ['#282828', '#fe8019', '#ebdbb2'] },
+    { id: 'solarized-dark', label: 'Solarized Dark', dots: ['#002b36', '#2aa198', '#93a1a1'] },
+    { id: 'catppuccin', label: 'Catppuccin', dots: ['#1e1e2e', '#cba6f7', '#cdd6f4'] },
+    { id: 'monokai', label: 'Monokai', dots: ['#272822', '#a6e22e', '#f8f8f2'] },
+    { id: 'everforest', label: 'Everforest', dots: ['#2b3339', '#a7c080', '#d3c6aa'] },
+    { id: 'solarized-light', label: 'Solarized Light', dots: ['#fdf6e3', '#2aa198', '#586e75'] },
   ];
   const THEME_KEY = 'keypace_theme_v1';
 
@@ -5031,6 +5170,12 @@
     { id: 'sourcecodepro', label: 'Source Code Pro', family: "'Source Code Pro', monospace" },
     { id: 'robotomono', label: 'Roboto Mono', family: "'Roboto Mono', monospace" },
     { id: 'courierprime', label: 'Courier Prime', family: "'Courier Prime', monospace" },
+    { id: 'inconsolata', label: 'Inconsolata', family: "'Inconsolata', monospace" },
+    { id: 'ubuntumono', label: 'Ubuntu Mono', family: "'Ubuntu Mono', monospace" },
+    { id: 'anonymouspro', label: 'Anonymous Pro', family: "'Anonymous Pro', monospace" },
+    { id: 'ptmono', label: 'PT Mono', family: "'PT Mono', monospace" },
+    { id: 'overpassmono', label: 'Overpass Mono', family: "'Overpass Mono', monospace" },
+    { id: 'dmmono', label: 'DM Mono', family: "'DM Mono', monospace" },
   ];
   const FONT_KEY = 'keypace_font_v1';
 
