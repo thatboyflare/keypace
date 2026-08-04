@@ -3943,6 +3943,20 @@
       const hasTrailingSpace = boundary < state.chars.length;
 
       if (boundary > i) {
+        // Distinguish "typed part of this word, then bailed to the next
+        // one" (a normal, common typing pattern — the space press was a
+        // real, deliberate keystroke and should still count) from "skipped
+        // the entire word with zero characters typed" (e.g. holding down
+        // the spacebar). Crediting the boundary space in the latter case is
+        // exactly what let pure spacebar-spam farm inflated WPM: at 19%
+        // accuracy every letter reads as an error, but each space press was
+        // still counted as one full correct keystroke, so WPM (driven only
+        // by correctKeystrokes) climbed anyway. Only the "typed something
+        // first" case should get credit for the space.
+        let wordStart = i;
+        while (wordStart > 0 && state.text[wordStart - 1] !== ' ') wordStart--;
+        const typedNothingOfThisWord = (i === wordStart);
+
         // Mid-word: jump straight to the next word instead of leaving a gap
         // of unfilled letters. Every remaining letter in this word gets
         // marked incorrect/missed (so accuracy still reflects the skip),
@@ -3958,9 +3972,11 @@
         }
         if (hasTrailingSpace) {
           // The boundary itself is a real space character — count this
-          // keystroke as the (correct) space press that advances past it.
+          // keystroke as the space press that advances past it. Only
+          // credit it toward WPM/accuracy if the word wasn't skipped
+          // entirely with zero effort (see comment above).
           state.keystrokes++;
-          state.correctKeystrokes++;
+          if (!typedNothingOfThisWord) state.correctKeystrokes++;
           state.chars[boundary].status = 'correct';
           const spaceSpan = charSpans()[boundary];
           if (spaceSpan) spaceSpan.classList.add('correct');
