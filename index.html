@@ -3684,7 +3684,7 @@
     document.body.classList.remove('zen-mode');
     document.getElementById('zenStage').style.display = 'none';
     document.getElementById('stage').style.display = 'flex';
-    cachedLineHeight = null; cachedPositions = []; cachedFieldRect = null;
+    cachedLineHeight = null; cachedPositions = []; cachedFieldRect = null; lastCaretLineIdx = -1;
 
     // Hide drill banner when starting a normal test
     if (state.mode !== '_drill' && state.mode !== '_retest') {
@@ -3836,7 +3836,18 @@
       if (field.scrollTop !== desiredScrollTop) field.scrollTop = desiredScrollTop;
 
       const y = lineIdx * lineHeight;
-      caretEl.style.transition = instant ? 'none' : 'transform 0.08s cubic-bezier(0.15, 0, 0.15, 1)';
+      // Only animate the caret when it's actually jumping to a new line —
+      // the overwhelming majority of keystrokes just move it one character
+      // to the right on the same line, and even a fast, well-eased glide on
+      // every single keystroke is a small but constant perceived delay
+      // between pressing a key and the caret finishing its move there. An
+      // instant snap for same-line movement removes that lag entirely for
+      // normal typing; the transition is reserved for line wraps, which are
+      // infrequent enough that a little motion there reads as polish rather
+      // than sluggishness.
+      const lineChanged = lineIdx !== lastCaretLineIdx;
+      lastCaretLineIdx = lineIdx;
+      caretEl.style.transition = (instant || !lineChanged) ? 'none' : 'transform 0.08s cubic-bezier(0.15, 0, 0.15, 1)';
       caretEl.style.transform  = `translate3d(${x}px, ${y}px, 0)`;
     }
 
@@ -3969,6 +3980,7 @@
   }
 
   let cachedLineHeight = null; cachedPositions = []; let cachedFieldRect = null;
+  let lastCaretLineIdx = -1; // tracks line changes so only line-wrap moves animate
   function getLineHeight() {
     if (cachedLineHeight) return cachedLineHeight;
     const cs = window.getComputedStyle(field);
@@ -5190,7 +5202,7 @@
     // Different monospace fonts have different character widths, so the
     // cached line-height (and every span position the caret depends on)
     // is stale the instant the font changes — same situation as a resize.
-    cachedLineHeight = null; cachedPositions = []; cachedFieldRect = null;
+    cachedLineHeight = null; cachedPositions = []; cachedFieldRect = null; lastCaretLineIdx = -1;
     updateCaret(true);
     // All font files are requested upfront in <head>, so this is normally
     // already a no-op — but if the chosen font was still downloading at
@@ -5200,7 +5212,7 @@
     // caret/line-height if that swap happens after the fact.
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => {
-        cachedLineHeight = null; cachedPositions = []; cachedFieldRect = null;
+        cachedLineHeight = null; cachedPositions = []; cachedFieldRect = null; lastCaretLineIdx = -1;
         updateCaret(true);
       });
     }
@@ -5687,7 +5699,7 @@
   });
 
   window.addEventListener('resize', () => {
-    cachedLineHeight = null; cachedPositions = []; cachedFieldRect = null;
+    cachedLineHeight = null; cachedPositions = []; cachedFieldRect = null; lastCaretLineIdx = -1;
     updateCaret(true);
   });
 
