@@ -1000,10 +1000,10 @@
   .caret {
     position: absolute;
     width: 2.5px;
-    height: 1.18em;
+    height: 0.86em;
     background: var(--accent);
     border-radius: 2px;
-    top: 0.18em;
+    top: 0.42em;
     left: 0;
     box-shadow: 0 0 12px var(--accent-glow);
     will-change: transform;
@@ -3552,7 +3552,7 @@
     document.body.classList.remove('zen-mode');
     document.getElementById('zenStage').style.display = 'none';
     document.getElementById('stage').style.display = 'flex';
-    cachedLineHeight = null; cachedPositions = [];
+    cachedLineHeight = null; cachedPositions = []; cachedFieldRect = null;
 
     // Hide drill banner when starting a normal test
     if (state.mode !== '_drill' && state.mode !== '_retest') {
@@ -3678,15 +3678,22 @@
 
       // Caret: position:absolute inside tapeInner, x at caretX, vertically centered
       const fieldH  = field.offsetHeight;
-      const caretH  = Math.round(fieldH * 0.72);
+      const caretH  = Math.round(fieldH * 0.5);
       const caretTop = Math.round((fieldH - caretH) / 2);
       caretEl.style.transition = 'none';
       caretEl.style.transform  = `translate3d(${caretX}px, ${caretTop}px, 0)`;
       caretEl.style.height     = `${caretH}px`;
       caretEl.style.top        = '0';
     } else {
-      // Normal multi-line mode
-      const fieldRect  = field.getBoundingClientRect();
+      // Normal multi-line mode. field's own bounding rect barely ever
+      // changes (only resize/font-change, which already invalidate this
+      // cache below) — recomputing it via getBoundingClientRect() on every
+      // single keystroke was a forced synchronous layout read for no
+      // reason, and at typing speed that adds up to visible stutter in the
+      // caret's motion. Only the target span's rect genuinely needs a fresh
+      // read every time, since it moves as you type.
+      if (!cachedFieldRect) cachedFieldRect = field.getBoundingClientRect();
+      const fieldRect  = cachedFieldRect;
       const tRect      = target.getBoundingClientRect();
       const lineHeight = getLineHeight();
       const x          = (tRect.left - fieldRect.left) + field.scrollLeft + (isEnd ? tRect.width : 0);
@@ -3697,7 +3704,7 @@
       if (field.scrollTop !== desiredScrollTop) field.scrollTop = desiredScrollTop;
 
       const y = lineIdx * lineHeight;
-      caretEl.style.transition = instant ? 'none' : 'transform 0.1s cubic-bezier(0.2, 0, 0.2, 1)';
+      caretEl.style.transition = instant ? 'none' : 'transform 0.08s cubic-bezier(0.15, 0, 0.15, 1)';
       caretEl.style.transform  = `translate3d(${x}px, ${y}px, 0)`;
     }
 
@@ -3829,7 +3836,7 @@
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
-  let cachedLineHeight = null; cachedPositions = [];
+  let cachedLineHeight = null; cachedPositions = []; let cachedFieldRect = null;
   function getLineHeight() {
     if (cachedLineHeight) return cachedLineHeight;
     const cs = window.getComputedStyle(field);
@@ -5022,7 +5029,7 @@
     // Different monospace fonts have different character widths, so the
     // cached line-height (and every span position the caret depends on)
     // is stale the instant the font changes — same situation as a resize.
-    cachedLineHeight = null; cachedPositions = [];
+    cachedLineHeight = null; cachedPositions = []; cachedFieldRect = null;
     updateCaret(true);
     // All font files are requested upfront in <head>, so this is normally
     // already a no-op — but if the chosen font was still downloading at
@@ -5032,7 +5039,7 @@
     // caret/line-height if that swap happens after the fact.
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => {
-        cachedLineHeight = null; cachedPositions = [];
+        cachedLineHeight = null; cachedPositions = []; cachedFieldRect = null;
         updateCaret(true);
       });
     }
@@ -5519,7 +5526,7 @@
   });
 
   window.addEventListener('resize', () => {
-    cachedLineHeight = null; cachedPositions = [];
+    cachedLineHeight = null; cachedPositions = []; cachedFieldRect = null;
     updateCaret(true);
   });
 
