@@ -3795,6 +3795,55 @@
   let cachedPositions = [];
   let tapeInner = null; // the sliding wrapper in tape mode
 
+  // Spring-interpolated caret motion (normal mode). Replaces CSS
+  // transitions for the caret's transform, which don't blend smoothly when
+  // redirected mid-flight — every keystroke retargets the transition, and
+  // at real typing speed a keystroke very often arrives before the
+  // previous ~80ms transition finishes. CSS doesn't preserve momentum when
+  // that happens; it restarts the easing curve from wherever the element
+  // currently sits, which reads as a series of small "catch-up" motions
+  // rather than one continuous glide — likely the source of a "steppy"
+  // feel even once raw performance is solid. A rAF-driven lerp toward a
+  // moving target blends continuously no matter how often the target
+  // changes, which is much closer to how a fluid, physics-feeling caret
+  // (like Monkeytype's) actually behaves. The field's own line-wrap scroll
+  // is folded into the same loop so text and caret always move in sync,
+  // instead of the caret gliding while the whole line block snaps instantly.
+  let caretTargetX = 0, caretTargetY = 0, caretCurX = 0, caretCurY = 0;
+  let fieldTargetScroll = 0, fieldCurScroll = 0;
+  let caretAnimRunning = false;
+
+  function caretAnimStep() {
+    const dx = caretTargetX - caretCurX;
+    const dy = caretTargetY - caretCurY;
+    const ds = fieldTargetScroll - fieldCurScroll;
+    const settled = Math.abs(dx) < 0.4 && Math.abs(dy) < 0.4 && Math.abs(ds) < 0.4;
+
+    if (settled) {
+      caretCurX = caretTargetX; caretCurY = caretTargetY; fieldCurScroll = fieldTargetScroll;
+    } else {
+      caretCurX += dx * 0.35;
+      caretCurY += dy * 0.35;
+      fieldCurScroll += ds * 0.35;
+    }
+
+    if (caretEl) caretEl.style.transform = `translate3d(${caretCurX}px, ${caretCurY}px, 0)`;
+    const roundedScroll = Math.round(fieldCurScroll);
+    if (field.scrollTop !== roundedScroll) field.scrollTop = roundedScroll;
+
+    if (settled) {
+      caretAnimRunning = false;
+    } else {
+      requestAnimationFrame(caretAnimStep);
+    }
+  }
+
+  function ensureCaretAnimRunning() {
+    if (caretAnimRunning) return;
+    caretAnimRunning = true;
+    requestAnimationFrame(caretAnimStep);
+  }
+
   function renderField() {
     const frag = document.createDocumentFragment();
     cachedSpans = new Array(state.chars.length);
@@ -3879,25 +3928,22 @@
       const x          = (tRect.left - fieldRect.left) + field.scrollLeft + (isEnd ? tRect.width : 0);
       const yAbsRaw    = (tRect.top - fieldRect.top) + field.scrollTop;
       const lineIdx    = Math.round(yAbsRaw / lineHeight);
-
       const desiredScrollTop = Math.round(Math.max(0, lineIdx - 1) * lineHeight);
-      if (field.scrollTop !== desiredScrollTop) field.scrollTop = desiredScrollTop;
-
       const y = lineIdx * lineHeight;
-      // Smooth, continuous motion on every keystroke — not just line wraps.
-      // An earlier version made same-line movement snap instantly with no
-      // transition at all, reasoning that any animation adds perceived lag.
-      // That was true when per-keystroke processing time was still slow,
-      // but it also produces exactly the "blocky"/discrete feel a fast
-      // typist would notice immediately: the caret teleporting character to
-      // character instead of gliding, unlike Monkeytype's caret, which
-      // moves continuously for every keystroke, not just some. Now that
-      // processing time is ~0-1ms (confirmed via profiling), a short glide
-      // should read as fluid rather than laggy — the lag was never really
-      // about the transition itself, it was about how long it took to
-      // start moving, which is now fixed at the source.
-      caretEl.style.transition = instant ? 'none' : 'transform 0.08s cubic-bezier(0.15, 0, 0.15, 1)';
-      caretEl.style.transform  = `translate3d(${x}px, ${y}px, 0)`;
+
+      caretTargetX = x;
+      caretTargetY = y;
+      fieldTargetScroll = desiredScrollTop;
+
+      if (instant) {
+        // Snap immediately — no spring, no glide. Used for test start/reset
+        // and other moments where an animated fly-in would look wrong.
+        caretCurX = x; caretCurY = y; fieldCurScroll = desiredScrollTop;
+        caretEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+        if (field.scrollTop !== desiredScrollTop) field.scrollTop = desiredScrollTop;
+      } else {
+        ensureCaretAnimRunning();
+      }
     }
 
     caretEl.classList.remove('blink');
