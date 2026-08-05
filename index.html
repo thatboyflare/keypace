@@ -948,13 +948,17 @@
     transition: filter 0.3s ease, opacity 0.3s ease;
     max-height: 144px;
     overflow: hidden;
-    /* Isolates this element's rendering: a single character's color
-       changing on every keystroke shouldn't ever force the browser to
-       reconsider painting anything outside this box — including the large,
-       page-spanning ambient background gradient (body::before) sitting
-       behind everything. Without this, the browser's paint-layer chunking
-       is a heuristic, not a guarantee; contain makes the boundary explicit. */
-    contain: content;
+    /* Isolates this element's layout/style from the rest of the page: a
+       single character's color changing on every keystroke shouldn't ever
+       force the browser to recompute layout or style for anything outside
+       this box. Deliberately NOT using `contain: paint` (or the `content`
+       shorthand, which includes it) here — paint containment forces the
+       whole box into a single paint layer, and Chrome's invalidation
+       confirmed via paint-flashing that this made the ENTIRE field repaint
+       on every keystroke instead of just the one changed character, which
+       is worse, not better. layout+style containment alone still isolates
+       from the ambient background outside without that trade-off. */
+    contain: layout style;
   }
   .field.blurred { filter: blur(6px); opacity: 0.6; }
 
