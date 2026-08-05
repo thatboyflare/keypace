@@ -2184,6 +2184,118 @@
   }
   .perf-best-card.empty .pbc-wpm { color: var(--ink-faint); }
 
+  /* ---------- progress delta cards ---------- */
+  .perf-progress-bar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .perf-progress-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .ppc-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    font-weight: 600;
+  }
+  .ppc-value {
+    font-family: var(--font-mono);
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--ink);
+  }
+  .ppc-value.positive { color: var(--good); }
+  .ppc-value.negative { color: var(--error); }
+  .ppc-value.neutral { color: var(--ink-faint); }
+  .ppc-sub { font-size: 11px; color: var(--ink-faint); }
+  .perf-progress-empty {
+    grid-column: 1 / -1;
+    color: var(--ink-faint);
+    font-size: 13px;
+    text-align: center;
+    padding: 16px 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+
+  /* ---------- chart metric toggle (reuses .perf-filter's look) ---------- */
+  .perf-metric-toggle {
+    display: flex;
+    gap: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 3px;
+  }
+  .perf-metric-toggle button {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--ink-faint);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .perf-metric-toggle button:hover { color: var(--ink-dim); }
+  .perf-metric-toggle button.active { background: var(--panel); color: var(--accent); }
+
+  /* ---------- activity heatmap ---------- */
+  .perf-activity {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    overflow-x: auto;
+  }
+  .perf-activity-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, 1fr);
+    gap: 3px;
+    width: max-content;
+  }
+  .perf-activity-cell {
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+  .perf-activity-empty {
+    color: var(--ink-faint);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px 0;
+  }
+  .perf-activity-legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 10px;
+    font-size: 10px;
+    color: var(--ink-faint);
+    justify-content: flex-end;
+  }
+  .perf-activity-legend .perf-activity-cell { width: 10px; height: 10px; }
+
+  @media (max-width: 640px) {
+    .perf-progress-bar { grid-template-columns: 1fr; }
+  }
+
   .perf-section { margin-bottom: 28px; }
   .perf-section-head {
     display: flex;
@@ -3281,23 +3393,38 @@
 
     <!-- My stats tab -->
     <div class="perf-tab-panel" id="perfTabStats">
+      <div class="perf-progress-bar" id="perfProgressBar"></div>
+
       <div class="perf-bests" id="perfBests"></div>
 
       <div class="perf-section">
         <div class="perf-section-head">
           <span class="perf-section-title">wpm over time</span>
-          <div class="perf-filter" id="perfFilter">
-            <button data-filter="all" class="active">all</button>
-            <button data-filter="time:15">15s</button>
-            <button data-filter="time:30">30s</button>
-            <button data-filter="time:60">60s</button>
-            <button data-filter="words:25">25w</button>
-            <button data-filter="words:50">50w</button>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <div class="perf-metric-toggle" id="perfMetricToggle">
+              <button data-metric="wpm" class="active">wpm</button>
+              <button data-metric="acc">accuracy</button>
+            </div>
+            <div class="perf-filter" id="perfFilter">
+              <button data-filter="all" class="active">all</button>
+              <button data-filter="time:15">15s</button>
+              <button data-filter="time:30">30s</button>
+              <button data-filter="time:60">60s</button>
+              <button data-filter="words:25">25w</button>
+              <button data-filter="words:50">50w</button>
+            </div>
           </div>
         </div>
         <div class="perf-chart-box">
           <svg id="perfChartSvg" viewBox="0 0 900 220" preserveAspectRatio="none"></svg>
         </div>
+      </div>
+
+      <div class="perf-section">
+        <div class="perf-section-head">
+          <span class="perf-section-title">activity</span>
+        </div>
+        <div class="perf-activity" id="perfActivity"></div>
       </div>
 
       <div class="perf-section">
@@ -4580,6 +4707,7 @@
   }
 
   let perfFilterKey = 'all';
+  let perfChartMetric = 'wpm'; // 'wpm' | 'acc'
 
   function formatDate(ts) {
     const d = new Date(ts);
@@ -4627,6 +4755,116 @@
     });
   }
 
+  // "Vs ~30 days ago" comparison — the most compelling single data point for
+  // showing genuine improvement, since it's the same story a person would
+  // tell themselves ("I'm faster than I was a month ago") rather than a
+  // raw number. Falls back gracefully for accounts too new to have a
+  // comparable window yet.
+  function renderProgressStats() {
+    const bar = document.getElementById('perfProgressBar');
+    if (!bar) return;
+
+    const source = perfFilterKey === 'all' ? history : history.filter(h => h.key === perfFilterKey);
+    if (source.length < 4) {
+      bar.innerHTML = `<div class="perf-progress-empty">complete a few more tests to see your trend</div>`;
+      return;
+    }
+
+    const now = Date.now();
+    const DAY = 86400000;
+    const recent = source.filter(h => now - h.date <= 7 * DAY);
+    const recentSample = recent.length ? recent : source.slice(0, 5);
+    // A comparable window centered ~30 days back, not just "before 30 days
+    // ago" — keeps the comparison to a similar-sized recent slice of time
+    // rather than lumping in someone's very first, roughest tests forever.
+    const baseline = source.filter(h => now - h.date >= 23 * DAY && now - h.date <= 37 * DAY);
+
+    const avg = (arr, key) => arr.length ? arr.reduce((a, h) => a + h[key], 0) / arr.length : null;
+    const recentWpm = avg(recentSample, 'wpm');
+    const recentAcc = avg(recentSample, 'acc');
+    const baseWpm = avg(baseline, 'wpm');
+    const baseAcc = avg(baseline, 'acc');
+    const testsThisMonth = source.filter(h => now - h.date <= 30 * DAY).length;
+
+    function deltaCard(label, current, base, unit) {
+      if (current == null) {
+        return `<div class="perf-progress-card"><div class="ppc-label">${label}</div><div class="ppc-value neutral">—</div><div class="ppc-sub">not enough data</div></div>`;
+      }
+      if (base == null) {
+        return `<div class="perf-progress-card"><div class="ppc-label">${label}</div><div class="ppc-value">${Math.round(current)}${unit}</div><div class="ppc-sub">recent average</div></div>`;
+      }
+      const delta = current - base;
+      const sign = delta > 0.05 ? '+' : '';
+      const cls = delta > 0.5 ? 'positive' : delta < -0.5 ? 'negative' : 'neutral';
+      return `<div class="perf-progress-card"><div class="ppc-label">${label}</div><div class="ppc-value ${cls}">${sign}${Math.round(delta * 10) / 10}${unit}</div><div class="ppc-sub">vs ~30 days ago</div></div>`;
+    }
+
+    bar.innerHTML = `
+      ${deltaCard('wpm trend', recentWpm, baseWpm, '')}
+      ${deltaCard('accuracy trend', recentAcc, baseAcc, '%')}
+      <div class="perf-progress-card">
+        <div class="ppc-label">tests this month</div>
+        <div class="ppc-value">${testsThisMonth}</div>
+        <div class="ppc-sub">${source.length} total${perfFilterKey !== 'all' ? ' (this mode)' : ''}</div>
+      </div>
+    `;
+  }
+
+  // GitHub-style contribution calendar built from raw test history dates —
+  // a fast, at-a-glance read on consistency that a WPM number alone can't
+  // convey, and reinforces the existing streak feature visually.
+  function renderActivityHeatmap() {
+    const container = document.getElementById('perfActivity');
+    if (!container) return;
+
+    if (!history.length) {
+      container.innerHTML = `<div class="perf-activity-empty">no activity yet — finish a test to start your streak</div>`;
+      return;
+    }
+
+    const DAY = 86400000;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const WEEKS = 14;
+    const totalDays = WEEKS * 7;
+
+    const counts = {};
+    history.forEach(h => {
+      const d = new Date(h.date);
+      d.setHours(0, 0, 0, 0);
+      const key = d.getTime();
+      counts[key] = (counts[key] || 0) + 1;
+    });
+
+    const startDate = new Date(today.getTime() - (totalDays - 1) * DAY);
+    startDate.setDate(startDate.getDate() - startDate.getDay()); // align to Sunday
+
+    const maxCount = Math.max(1, ...Object.values(counts));
+    const accent = themeVar('--accent');
+
+    let cells = '';
+    let cursor = new Date(startDate);
+    while (cursor <= today) {
+      const key = cursor.getTime();
+      const count = counts[key] || 0;
+      const intensity = count === 0 ? 0 : Math.min(4, Math.ceil((count / maxCount) * 4));
+      const bg = count === 0 ? 'var(--bg)' : hexToRgba(accent, 0.2 + intensity * 0.2);
+      const label = cursor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      cells += `<div class="perf-activity-cell" style="background:${bg}" title="${count} test${count === 1 ? '' : 's'} on ${label}"></div>`;
+      cursor = new Date(cursor.getTime() + DAY);
+    }
+
+    const legendCells = [0, 1, 2, 3, 4].map(l => {
+      const bg = l === 0 ? 'var(--bg)' : hexToRgba(accent, 0.2 + l * 0.2);
+      return `<div class="perf-activity-cell" style="background:${bg}"></div>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="perf-activity-grid">${cells}</div>
+      <div class="perf-activity-legend"><span>less</span>${legendCells}<span>more</span></div>
+    `;
+  }
+
   function renderPerfChart() {
     const svg = document.getElementById('perfChartSvg');
     const box = svg.closest('.perf-chart-box');
@@ -4653,14 +4891,24 @@
     if (existingEmpty) existingEmpty.remove();
     svg.style.display = '';
 
+    const isAcc = perfChartMetric === 'acc';
+    const valueOf = p => isAcc ? p.acc : p.wpm;
+
     const W = 900, H = 220, PAD = 10;
     const n = points.length;
-    const maxWpm = Math.max(10, ...points.map(p => p.wpm)) * 1.15;
+    const rawVals = points.map(valueOf);
+    // wpm charts from 0 with headroom above the peak; accuracy is almost
+    // always clustered in a narrow high band (85-100%), so a 0-based scale
+    // would flatten the trend into a nearly-straight line near the top —
+    // instead scale accuracy tightly around its own observed range.
+    const maxVal = isAcc ? Math.min(100, Math.max(...rawVals) + 3) : Math.max(10, ...rawVals) * 1.15;
+    const minVal = isAcc ? Math.max(0, Math.min(...rawVals) - 8) : 0;
+    const range = Math.max(1, maxVal - minVal);
     const inkFaint = themeVar('--ink-faint');
     const accent = themeVar('--accent');
 
     const xFor = (i) => PAD + (i / (n - 1)) * (W - PAD * 2);
-    const yFor = (v) => H - PAD - (v / maxWpm) * (H - PAD * 2);
+    const yFor = (v) => H - PAD - ((v - minVal) / range) * (H - PAD * 2);
 
     for (let g = 0; g <= 4; g++) {
       const y = PAD + (g / 4) * (H - PAD * 2);
@@ -4672,7 +4920,7 @@
       svg.appendChild(line);
     }
 
-    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i)} ${yFor(p.wpm)}`).join(' ');
+    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i)} ${yFor(valueOf(p))}`).join(' ');
     const areaPath = linePath + ` L ${xFor(n - 1)} ${H - PAD} L ${xFor(0)} ${H - PAD} Z`;
 
     const area = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -4690,12 +4938,13 @@
     svg.appendChild(path);
 
     points.forEach((p, i) => {
+      const v = valueOf(p);
       const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      c.setAttribute('cx', xFor(i)); c.setAttribute('cy', yFor(p.wpm));
+      c.setAttribute('cx', xFor(i)); c.setAttribute('cy', yFor(v));
       c.setAttribute('r', n > 40 ? 0 : 3);
       c.setAttribute('fill', accent);
       const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-      title.textContent = p.wpm + ' wpm · ' + formatDate(p.date);
+      title.textContent = (isAcc ? v + '% accuracy' : v + ' wpm') + ' · ' + formatDate(p.date);
       c.appendChild(title);
       svg.appendChild(c);
     });
@@ -4830,8 +5079,10 @@
   }
 
   function refreshPerfPage() {
+    renderProgressStats();
     renderPerfBests();
     renderPerfChart();
+    renderActivityHeatmap();
     renderPerfTable();
   }
 
@@ -5000,6 +5251,16 @@
     document.querySelectorAll('#perfFilter button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     perfFilterKey = btn.dataset.filter;
+    renderPerfChart();
+    renderProgressStats();
+  });
+
+  document.getElementById('perfMetricToggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    document.querySelectorAll('#perfMetricToggle button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    perfChartMetric = btn.dataset.metric;
     renderPerfChart();
   });
 
