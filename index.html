@@ -6138,9 +6138,17 @@
     banner.style.display = '';
 
     document.getElementById('challengeBannerAccept').addEventListener('click', () => {
+      // Hide the banner FIRST — buildTest() (triggered by the click below)
+      // measures the field's actual on-screen position to place the caret,
+      // and getBoundingClientRect() forces the browser to lay out
+      // synchronously at that moment. If the banner were hidden after,
+      // buildTest() would measure the field while the banner was still
+      // occupying space above it, then the banner's removal would shift
+      // the field upward without the caret's position being recalculated —
+      // exactly the "no visible cursor" bug this fixes.
+      banner.style.display = 'none';
       const targetBtn = modesNav.querySelector(`button[data-mode="${pendingChallenge.mode}"][data-val="${pendingChallenge.val}"]`);
       if (targetBtn) targetBtn.click(); // real mode-switch handler above — correct by construction
-      banner.style.display = 'none';
       // pendingChallenge itself stays set — the results screen checks it
       // after this exact test completes to show the win/lose comparison.
       focusInput();
