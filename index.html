@@ -2229,6 +2229,24 @@
     border-radius: 10px;
   }
 
+  /* ---------- most improved callout ---------- */
+  .perf-most-improved { margin-bottom: 20px; }
+  .perf-improved-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .perf-improved-pill {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-dim);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .perf-improved-pill .pip-before { color: var(--ink-faint); text-decoration: line-through; }
+  .perf-improved-pill .pip-after { color: var(--good); font-weight: 700; }
+
   /* ---------- chart metric toggle (reuses .perf-filter's look) ---------- */
   .perf-metric-toggle {
     display: flex;
@@ -3394,6 +3412,8 @@
     <!-- My stats tab -->
     <div class="perf-tab-panel" id="perfTabStats">
       <div class="perf-progress-bar" id="perfProgressBar"></div>
+
+      <div class="perf-most-improved" id="perfMostImproved" style="display:none"></div>
 
       <div class="perf-bests" id="perfBests"></div>
 
@@ -5078,8 +5098,35 @@
     if (authSession) pushStats().catch(() => {});
   }
 
+  // Renders the "most improved" callout using the honest early-vs-recent
+  // bucket comparison from getMostImproved() — hidden entirely if there's
+  // not yet enough distinct weekly history to make a fair comparison.
+  function renderMostImproved() {
+    const container = document.getElementById('perfMostImproved');
+    if (!container) return;
+    const improvements = getMostImproved();
+    if (!improvements || !improvements.length) {
+      container.style.display = 'none';
+      return;
+    }
+    container.style.display = '';
+    container.innerHTML = `
+      <div class="perf-section-title" style="margin-bottom:8px;">most improved</div>
+      <div class="perf-improved-list">
+        ${improvements.map(imp => `
+          <div class="perf-improved-pill">
+            "${escHtml(imp.key)}" ${imp.type === 'char' ? 'errors' : ''}
+            <span class="pip-before">${imp.before}${imp.unit}</span> →
+            <span class="pip-after">${imp.after}${imp.unit}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
   function refreshPerfPage() {
     renderProgressStats();
+    renderMostImproved();
     renderPerfBests();
     renderPerfChart();
     renderActivityHeatmap();
@@ -8393,18 +8440,28 @@ COACHING GUIDELINES:
   // the overlay is opened cold, with no test completed this session.
   // Deliberately local-only (not synced to the cloud): it's a device-level
   // practice history, not account data, so no schema change is needed.
+  //
+  // Stored as weekly buckets, not a single flat cumulative total. A single
+  // ever-growing aggregate can only answer "what's true overall" — it
+  // can't answer "has this specific bigram actually gotten faster
+  // recently," because old data dominates a lifetime average forever (500
+  // tests of history barely budge even after genuine recent improvement).
+  // Buckets let us compare an early period against a recent one honestly.
+  // buildAggregateDiagnostic() sums across all buckets to reconstruct the
+  // same lifetime view the coach/drill system already relies on, so that
+  // behavior is unchanged — the bucketing is purely additive.
   // ================================================================
   const WEAKNESS_KEY = 'keypace_weakness_v1';
   const WEAKNESS_PROFILE_MIN_TESTS = 5; // don't trust the aggregate until there's real signal
+  const WEAKNESS_MAX_BUCKETS = 26; // ~6 months of weekly buckets
 
-  function loadWeaknessProfile() {
-    try {
-      return JSON.parse(localStorage.getItem(WEAKNESS_KEY)) || null;
-    } catch { return null; }
-  }
-
-  function saveWeaknessProfile(p) {
-    try { localStorage.setItem(WEAKNESS_KEY, JSON.stringify(p)); } catch {}
+  function isoWeekKey(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNum = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
   }
 
   function blankWeaknessProfile() {
@@ -8420,11 +8477,35 @@ COACHING GUIDELINES:
     };
   }
 
-  // Folds one test's diagnostic result into the running aggregate. Called
-  // once per completed real test (not drills/retests — those are practice
-  // on an already-known weakness, not fresh signal about overall patterns).
+  function loadWeaknessStore() {
+    let raw;
+    try {
+      raw = JSON.parse(localStorage.getItem(WEAKNESS_KEY));
+    } catch { return { buckets: {} }; }
+    if (!raw) return { buckets: {} };
+    if (raw.buckets) return raw; // already in bucketed format
+
+    // Migrating an old flat-aggregate profile (pre-bucketing): fold its
+    // totals into the current week's bucket rather than discarding them.
+    // This does misattribute historically-accumulated data to "this week,"
+    // but that's a one-time, honest tradeoff — losing months of signal
+    // outright on upgrade would be worse than a single imprecise bucket.
+    const key = isoWeekKey(new Date());
+    return { buckets: { [key]: raw } };
+  }
+
+  function saveWeaknessStore(store) {
+    try { localStorage.setItem(WEAKNESS_KEY, JSON.stringify(store)); } catch {}
+  }
+
+  // Folds one test's diagnostic result into the current week's bucket.
+  // Called once per completed real test (not drills/retests — those are
+  // practice on an already-known weakness, not fresh signal about overall
+  // patterns).
   function updateWeaknessProfile(diag) {
-    const p = loadWeaknessProfile() || blankWeaknessProfile();
+    const store = loadWeaknessStore();
+    const key = isoWeekKey(new Date());
+    const p = store.buckets[key] || blankWeaknessProfile();
 
     p.testCount += 1;
     p.updatedAt = Date.now();
@@ -8461,9 +8542,8 @@ COACHING GUIDELINES:
       p.secondHalfSum += diag.secondHalfWpm;
     }
 
-    // Keep the char/bigram maps from growing unbounded over months of use —
-    // cap to the 40 highest-total entries each, which is far more than any
-    // drill or coach message needs.
+    // Keep each bucket's char/bigram maps bounded — 40 highest-total
+    // entries is far more than any drill or coach message needs.
     const capMap = (map, sortKey) => {
       const entries = Object.entries(map);
       if (entries.length <= 40) return map;
@@ -8473,8 +8553,106 @@ COACHING GUIDELINES:
     p.chars = capMap(p.chars, 'total');
     p.bigrams = capMap(p.bigrams, 'count');
 
-    saveWeaknessProfile(p);
-    return p;
+    store.buckets[key] = p;
+
+    // Bound total storage — drop the oldest buckets beyond ~6 months.
+    const sortedKeys = Object.keys(store.buckets).sort();
+    if (sortedKeys.length > WEAKNESS_MAX_BUCKETS) {
+      sortedKeys.slice(0, sortedKeys.length - WEAKNESS_MAX_BUCKETS).forEach(k => delete store.buckets[k]);
+    }
+
+    saveWeaknessStore(store);
+    return store;
+  }
+
+  // Sums every bucket into one lifetime-equivalent profile — this is what
+  // the coach/drill system consumes, so bucketing is invisible to it; it
+  // still sees "everything the user has ever done," same as before.
+  function mergeAllBuckets(store) {
+    const merged = blankWeaknessProfile();
+    Object.values(store.buckets || {}).forEach(b => {
+      merged.testCount += b.testCount || 0;
+      Object.entries(b.chars || {}).forEach(([ch, v]) => {
+        if (!merged.chars[ch]) merged.chars[ch] = { errors: 0, total: 0 };
+        merged.chars[ch].errors += v.errors; merged.chars[ch].total += v.total;
+      });
+      Object.entries(b.bigrams || {}).forEach(([bg, v]) => {
+        if (!merged.bigrams[bg]) merged.bigrams[bg] = { totalDelay: 0, count: 0 };
+        merged.bigrams[bg].totalDelay += v.totalDelay; merged.bigrams[bg].count += v.count;
+      });
+      merged.medianIntervalSum += b.medianIntervalSum || 0;
+      merged.medianIntervalCount += b.medianIntervalCount || 0;
+      merged.punctTyped += b.punctTyped || 0;
+      merged.punctErrors += b.punctErrors || 0;
+      merged.capitalTyped += b.capitalTyped || 0;
+      merged.capitalErrors += b.capitalErrors || 0;
+      merged.enduranceCount += b.enduranceCount || 0;
+      merged.decaySum += b.decaySum || 0;
+      merged.firstHalfSum += b.firstHalfSum || 0;
+      merged.secondHalfSum += b.secondHalfSum || 0;
+    });
+    return merged;
+  }
+
+  // Compares the earliest available data against the most recent to find
+  // genuine, honest improvement — not a lifetime average, which would mask
+  // exactly this kind of recent gain. Requires at least 2 distinct weekly
+  // buckets to have anything to compare at all.
+  function getMostImproved() {
+    const store = loadWeaknessStore();
+    const keys = Object.keys(store.buckets).sort(); // ISO week keys sort chronologically as strings
+    if (keys.length < 2) return null;
+
+    function sumRange(bucketKeys) {
+      const merged = blankWeaknessProfile();
+      bucketKeys.forEach(k => {
+        const b = store.buckets[k];
+        if (!b) return;
+        Object.entries(b.chars || {}).forEach(([ch, v]) => {
+          if (!merged.chars[ch]) merged.chars[ch] = { errors: 0, total: 0 };
+          merged.chars[ch].errors += v.errors; merged.chars[ch].total += v.total;
+        });
+        Object.entries(b.bigrams || {}).forEach(([bg, v]) => {
+          if (!merged.bigrams[bg]) merged.bigrams[bg] = { totalDelay: 0, count: 0 };
+          merged.bigrams[bg].totalDelay += v.totalDelay; merged.bigrams[bg].count += v.count;
+        });
+      });
+      return merged;
+    }
+
+    const recentKeys = keys.slice(-2);
+    const earlyKeys = keys.slice(0, 2);
+    if (recentKeys.some(k => earlyKeys.includes(k))) return null; // not enough distinct history yet
+
+    const recent = sumRange(recentKeys);
+    const early = sumRange(earlyKeys);
+    const improvements = [];
+
+    Object.keys(early.bigrams).forEach(bg => {
+      const e = early.bigrams[bg], r = recent.bigrams[bg];
+      if (!e || !r || e.count < 3 || r.count < 3) return;
+      const earlyAvg = e.totalDelay / e.count;
+      const recentAvg = r.totalDelay / r.count;
+      const improvementPct = (earlyAvg - recentAvg) / earlyAvg;
+      if (improvementPct > 0.15) {
+        improvements.push({ type: 'bigram', key: bg, before: Math.round(earlyAvg), after: Math.round(recentAvg), improvementPct, unit: 'ms' });
+      }
+    });
+
+    Object.keys(early.chars).forEach(ch => {
+      const e = early.chars[ch], r = recent.chars[ch];
+      if (!e || !r || e.total < 10 || r.total < 10) return;
+      const earlyRate = e.errors / e.total;
+      if (earlyRate < 0.05) return; // wasn't really a weak point to begin with
+      const recentRate = r.errors / r.total;
+      const improvementPct = (earlyRate - recentRate) / earlyRate;
+      if (improvementPct > 0.2) {
+        improvements.push({ type: 'char', key: ch, before: Math.round(earlyRate * 100), after: Math.round(recentRate * 100), improvementPct, unit: '%' });
+      }
+    });
+
+    improvements.sort((a, b) => b.improvementPct - a.improvementPct);
+    return improvements.slice(0, 3);
   }
 
   // Rebuilds a diag-shaped object from the persistent profile so it can be
@@ -8483,8 +8661,9 @@ COACHING GUIDELINES:
   // profile doesn't track individual words, so the speed-drill fallback
   // (buildSpeedDrill) is used instead of a word-focused one, which is fine.
   function buildAggregateDiagnostic() {
-    const p = loadWeaknessProfile();
-    if (!p || p.testCount < WEAKNESS_PROFILE_MIN_TESTS) return null;
+    const store = loadWeaknessStore();
+    const p = mergeAllBuckets(store);
+    if (p.testCount < WEAKNESS_PROFILE_MIN_TESTS) return null;
 
     const recentTests = history.slice(0, 30);
     const avgWpm = recentTests.length
