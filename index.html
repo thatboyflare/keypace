@@ -394,6 +394,16 @@
       radial-gradient(ellipse 800px 500px at 50% -10%, var(--accent-wash), transparent 60%);
     pointer-events: none;
     z-index: 0;
+    /* This gradient is completely static — it never changes after first
+       paint. position:fixed alone doesn't guarantee its own persistent GPU
+       layer, so without an explicit compositing hint it can end up sharing
+       a paint layer with dynamic content elsewhere on the page (like the
+       typing field, which repaints on every keystroke) — meaning this
+       expensive-to-rasterize soft gradient could be needlessly redrawn
+       every time something completely unrelated changes. will-change forces
+       it onto its own layer: rasterized once, then just cheaply composited
+       from then on regardless of what else on the page repaints. */
+    will-change: transform;
   }
 
   .wrap {
@@ -948,17 +958,15 @@
     transition: filter 0.3s ease, opacity 0.3s ease;
     max-height: 144px;
     overflow: hidden;
-    /* Isolates this element's layout/style from the rest of the page: a
-       single character's color changing on every keystroke shouldn't ever
-       force the browser to recompute layout or style for anything outside
-       this box. Deliberately NOT using `contain: paint` (or the `content`
-       shorthand, which includes it) here — paint containment forces the
-       whole box into a single paint layer, and Chrome's invalidation
-       confirmed via paint-flashing that this made the ENTIRE field repaint
-       on every keystroke instead of just the one changed character, which
-       is worse, not better. layout+style containment alone still isolates
-       from the ambient background outside without that trade-off. */
-    contain: layout style;
+    /* Isolates this element's layout/style/paint from the rest of the page.
+       Note: removing paint containment was tested as a hypothesis for the
+       whole-field repaint-on-every-keystroke behavior seen in DevTools
+       paint-flashing — it did NOT fix that (confirmed via testing), so
+       paint containment wasn't the cause. Restored here since it still has
+       real value: it guarantees this element can't affect external layout/
+       paint (like the ambient background gradient) regardless of how often
+       its own internal content repaints. */
+    contain: content;
   }
   .field.blurred { filter: blur(6px); opacity: 0.6; }
 
