@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -1099,6 +1098,29 @@
     transition: color 0.15s, border-color 0.15s;
   }
   .drill-banner-exit:hover { color: var(--ink); border-color: var(--ink-dim); }
+
+  .challenge-banner {
+    background: var(--bg-soft);
+    border-color: var(--good);
+  }
+  .challenge-banner .drill-banner-icon,
+  .challenge-banner .drill-banner-label { color: var(--good); }
+  .challenge-banner .drill-banner-exit { border-color: var(--good); color: var(--good); }
+  .challenge-banner .drill-banner-exit:hover { background: var(--good); color: var(--bg); }
+
+  .challenge-result {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--good);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-top: 14px;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    color: var(--ink-dim);
+  }
+  .challenge-result b { color: var(--ink); }
+  .challenge-result.lost { border-left-color: var(--accent); }
 
   .capslock-warning {
     display: none;
@@ -3237,6 +3259,18 @@
         <button class="drill-banner-exit" id="drillBannerExit" title="Exit drill">exit drill</button>
       </div>
 
+      <!-- Challenge banner — shown when this page was opened via a friend's challenge link -->
+      <div class="drill-banner challenge-banner" id="challengeBanner" style="display:none">
+        <div class="drill-banner-inner">
+          <span class="drill-banner-icon">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          </span>
+          <span class="drill-banner-label" id="challengeBannerLabel"></span>
+          <span class="drill-banner-goal" id="challengeBannerGoal"></span>
+        </div>
+        <button class="drill-banner-exit" id="challengeBannerAccept" title="Take the challenge">accept →</button>
+      </div>
+
       <div class="topline">
         <div class="timer" id="timer">30</div>
         <div class="topline-right">
@@ -3335,7 +3369,14 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
           share
         </button>
+        <button class="btn" id="challengeBtn" title="Challenge a friend to beat this score">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          challenge a friend
+        </button>
       </div>
+
+      <!-- Shown only when this result completed a challenge someone sent you -->
+      <div class="challenge-result" id="challengeResult" style="display:none"></div>
 
       <!-- First-session progress bar — only visible to new users in first session -->
       <div class="session-progress" id="sessionProgress" style="display:none">
@@ -3386,7 +3427,7 @@
   </main>
 
   <footer>
-    <div>made by <span class="credit">Saim Abbasi</span> · <a href="/privacy.html" style="font-size:11px;color:var(--ink-faint);text-decoration:none;" id="privacyBtn">privacy & terms</a></div>
+    <div>made by <span class="credit">Saim Abbasi</span> · <a href="/privacy.html" style="font-size:11px;color:var(--ink-faint);text-decoration:none;" id="privacyBtn">privacy & terms</a> · <a href="/programmer-typing-test.html" style="font-size:11px;color:var(--ink-faint);text-decoration:none;">programmer typing test</a> · <a href="/improve-typing-speed.html" style="font-size:11px;color:var(--ink-faint);text-decoration:none;">improve your typing speed</a></div>
     <div class="keys">
       <span><kbd>tab</kbd> restart</span>
       <span><kbd>esc</kbd> stop</span>
@@ -3411,6 +3452,13 @@
 
     <!-- My stats tab -->
     <div class="perf-tab-panel" id="perfTabStats">
+      <div class="perf-section-head" style="margin-bottom:8px;">
+        <span></span>
+        <button class="perf-replay-btn" id="shareProgressBtn" style="display:none;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+          share progress
+        </button>
+      </div>
       <div class="perf-progress-bar" id="perfProgressBar"></div>
 
       <div class="perf-most-improved" id="perfMostImproved" style="display:none"></div>
@@ -3506,7 +3554,7 @@
 <div class="share-modal" id="shareModal">
   <div class="share-modal-panel">
     <div class="share-modal-header">
-      <span class="share-modal-title">share result</span>
+      <span class="share-modal-title" id="shareModalTitle">share result</span>
       <button class="icon-btn" id="shareModalCloseBtn" aria-label="Close">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
@@ -3669,6 +3717,37 @@
   const settings = Object.assign({ punctuation: false, numbers: false, sound: false, soundStyle: 'click', code: false, tape: false }, loadJSON(SETTINGS_KEY, {}));
   let bests = loadJSON(BESTS_KEY, {});       // { "time:30": {wpm, acc, date}, ... }
   let history = loadJSON(HISTORY_KEY, []);   // [ {key, wpm, acc, date}, ... ] newest first, capped
+
+  // Landing pages can deep-link straight into a specific mode instead of
+  // dumping visitors on the homepage and hoping they find the right toggle
+  // themselves — e.g. /?mode=code from the programmer-typing-test page.
+  // Only a small allowlist of modes is honored, and this only ever
+  // overrides the mode setting itself, never anything auth/data-related.
+  //
+  // A "challenge" link works the same way but for mode+val together, plus
+  // a name and score to beat — no backend/accounts needed, the whole thing
+  // rides in the URL. Parsed here, acted on further down once the DOM/mode
+  // buttons exist.
+  let pendingChallenge = null;
+  (function applyModeFromQueryParam() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const qp = params.get('mode');
+      if (qp === 'code') { settings.code = true; settings.punctuation = false; settings.numbers = false; }
+      else if (qp === 'punctuation') { settings.punctuation = true; settings.code = false; }
+
+      if (params.get('challenge') === '1') {
+        const cmode = params.get('cmode');
+        const cval = parseInt(params.get('cval'), 10);
+        const cwpm = parseInt(params.get('cwpm'), 10);
+        const cacc = parseInt(params.get('cacc'), 10);
+        const cname = (params.get('cn') || 'someone').slice(0, 24); // bound length, this rides in a URL
+        if (cmode && (cmode === 'time' || cmode === 'words') && cval > 0 && cwpm > 0) {
+          pendingChallenge = { mode: cmode, val: cval, wpm: cwpm, acc: isNaN(cacc) ? null : cacc, name: cname };
+        }
+      }
+    } catch {}
+  })();
 
   function bestKeyFor(mode, val, opts) {
     const o = opts || settings;
@@ -4581,6 +4660,34 @@
     // ---- save for share card ----
     lastResultData = { wpm, acc: accClamped, raw, mode: state.mode, val: state.val, date: Date.now() };
 
+    // Only time/words results have a fixed target worth challenging someone
+    // to beat — daily/zen don't map cleanly onto a "beat this score" link.
+    const challengeBtnEl = document.getElementById('challengeBtn');
+    if (challengeBtnEl) challengeBtnEl.style.display = (state.mode === 'time' || state.mode === 'words') ? '' : 'none';
+
+    // If this test was taken specifically to accept a friend's challenge
+    // (same mode + val as pendingChallenge), show the win/lose comparison
+    // once, then clear it so it doesn't reappear on unrelated later tests.
+    const challengeResultEl = document.getElementById('challengeResult');
+    if (challengeResultEl) {
+      if (pendingChallenge && pendingChallenge.mode === state.mode && pendingChallenge.val === state.val) {
+        const won = wpm > pendingChallenge.wpm;
+        const tied = wpm === pendingChallenge.wpm;
+        challengeResultEl.className = 'challenge-result' + (won ? '' : ' lost');
+        challengeResultEl.style.display = '';
+        if (tied) {
+          challengeResultEl.innerHTML = `Dead even with <b>${escHtml(pendingChallenge.name)}</b> — both at <b>${wpm} wpm</b>. Run it back?`;
+        } else if (won) {
+          challengeResultEl.innerHTML = `You beat <b>${escHtml(pendingChallenge.name)}</b>'s <b>${pendingChallenge.wpm} wpm</b> with <b>${wpm} wpm</b>! 🎉`;
+        } else {
+          challengeResultEl.innerHTML = `<b>${escHtml(pendingChallenge.name)}</b>'s <b>${pendingChallenge.wpm} wpm</b> still stands — you got <b>${wpm} wpm</b>. Try again?`;
+        }
+        pendingChallenge = null; // one-time comparison
+      } else {
+        challengeResultEl.style.display = 'none';
+      }
+    }
+
     stage.style.display = 'none';
     restartRow.classList.add('hide');
     result.classList.add('show');
@@ -4787,6 +4894,8 @@
     const source = perfFilterKey === 'all' ? history : history.filter(h => h.key === perfFilterKey);
     if (source.length < 4) {
       bar.innerHTML = `<div class="perf-progress-empty">complete a few more tests to see your trend</div>`;
+      const shareBtnEarly = document.getElementById('shareProgressBtn');
+      if (shareBtnEarly) shareBtnEarly.style.display = 'none';
       return;
     }
 
@@ -4805,6 +4914,19 @@
     const baseWpm = avg(baseline, 'wpm');
     const baseAcc = avg(baseline, 'acc');
     const testsThisMonth = source.filter(h => now - h.date <= 30 * DAY).length;
+
+    const shareBtn = document.getElementById('shareProgressBtn');
+    if (shareBtn) {
+      // The share card always tells an overall progress story (not
+      // mode-specific), so its availability shouldn't depend on whatever
+      // mode filter happens to be selected on the chart above it — check
+      // against unfiltered history directly, matching openShareProgress().
+      const allRecent = history.filter(h => now - h.date <= 7 * DAY);
+      const allRecentSample = allRecent.length ? allRecent : history.slice(0, 5);
+      const allBaseline = history.filter(h => now - h.date >= 23 * DAY && now - h.date <= 37 * DAY);
+      const shareAvailable = avg(allRecentSample, 'wpm') != null && avg(allBaseline, 'wpm') != null;
+      shareBtn.style.display = shareAvailable ? '' : 'none';
+    }
 
     function deltaCard(label, current, base, unit) {
       if (current == null) {
@@ -5998,6 +6120,32 @@
     buildTest();
     focusInput();
   });
+
+  // ---------------- challenge links ----------------
+  // pendingChallenge (parsed from the URL in the query-param IIFE near the
+  // top of this script) rides entirely in the link — no accounts, no
+  // backend. If present, show a banner naming the challenge; accepting it
+  // switches to the exact mode by clicking the real mode button (so all the
+  // normal mode-switch logic — saving, rebuilding — runs correctly, rather
+  // than duplicating it here) instead of just hiding the banner.
+  if (pendingChallenge) {
+    const banner = document.getElementById('challengeBanner');
+    const label = document.getElementById('challengeBannerLabel');
+    const goal = document.getElementById('challengeBannerGoal');
+    const modeLabel = pendingChallenge.mode === 'time' ? `${pendingChallenge.val}s` : `${pendingChallenge.val}w`;
+    label.textContent = `${pendingChallenge.name} challenged you`;
+    goal.textContent = `beat ${pendingChallenge.wpm} wpm on the ${modeLabel} test`;
+    banner.style.display = '';
+
+    document.getElementById('challengeBannerAccept').addEventListener('click', () => {
+      const targetBtn = modesNav.querySelector(`button[data-mode="${pendingChallenge.mode}"][data-val="${pendingChallenge.val}"]`);
+      if (targetBtn) targetBtn.click(); // real mode-switch handler above — correct by construction
+      banner.style.display = 'none';
+      // pendingChallenge itself stays set — the results screen checks it
+      // after this exact test completes to show the win/lose comparison.
+      focusInput();
+    });
+  }
 
   document.getElementById('restartBtn').addEventListener('click', () => { buildTest(); focusInput(); });
   document.getElementById('logoWrap').addEventListener('click', () => { buildTest(); focusInput(); });
@@ -7625,7 +7773,179 @@ COACHING GUIDELINES:
     ctx.closePath();
   }
 
+  // A single test result isn't that compelling to share — genuine
+  // improvement over time is. This draws the same visual language as
+  // drawShareCard but for a "here's how far I've come" story instead of a
+  // single number, using the exact same progress-delta math the stats page
+  // already computes (renderProgressStats/getMostImproved).
+  function drawProgressShareCard(deltaWpm, testsThisMonth, improvement) {
+    const canvas = document.getElementById('shareCanvas');
+    const W = 1200, H = 630;
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    const cs = getComputedStyle(document.documentElement);
+    const bg       = cs.getPropertyValue('--bg').trim();
+    const accent   = cs.getPropertyValue('--accent').trim();
+    const good     = cs.getPropertyValue('--good').trim();
+    const ink      = cs.getPropertyValue('--ink').trim();
+    const inkDim   = cs.getPropertyValue('--ink-dim').trim();
+    const inkFaint = cs.getPropertyValue('--ink-faint').trim();
+
+    const CX = W / 2;
+    const heroColor = deltaWpm >= 0 ? good : accent;
+
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    const grd = ctx.createRadialGradient(CX, 0, 0, CX, 0, 560);
+    grd.addColorStop(0, hexToRgba(heroColor, 0.07));
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+
+    const barH = 4;
+    const grad = ctx.createLinearGradient(0, 0, W, 0);
+    grad.addColorStop(0, 'transparent');
+    grad.addColorStop(0.3, heroColor);
+    grad.addColorStop(0.7, heroColor);
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, barH);
+
+    ctx.textBaseline = 'top';
+    ctx.font = '600 24px monospace';
+    ctx.fillStyle = inkDim;
+    ctx.textAlign = 'left';
+    ctx.fillText('keypace', 64, 52);
+    ctx.fillStyle = accent;
+    ctx.fillText('_', 64 + ctx.measureText('keypace').width, 52);
+
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    ctx.font = '400 14px sans-serif';
+    ctx.fillStyle = inkFaint;
+    ctx.textAlign = 'right';
+    ctx.fillText(dateStr, W - 64, 56);
+
+    ctx.font = '500 15px sans-serif';
+    ctx.fillStyle = inkFaint;
+    ctx.textAlign = 'center';
+    ctx.letterSpacing = '0.08em';
+    ctx.fillText('LAST 30 DAYS', CX, 140);
+    ctx.letterSpacing = '0';
+
+    // ── Giant delta WPM — centered hero ──────────────────────────────────────
+    const heroText = (deltaWpm >= 0 ? '+' : '') + deltaWpm;
+    ctx.font = '700 195px monospace';
+    ctx.fillStyle = heroColor;
+    ctx.textAlign = 'center';
+    ctx.fillText(heroText, CX, 158);
+
+    ctx.font = '300 24px sans-serif';
+    ctx.fillStyle = inkDim;
+    ctx.textAlign = 'center';
+    ctx.fillText('wpm vs a month ago', CX, 400);
+
+    // ── Most-improved highlight line (if there's one to show) ───────────────
+    let pillY = 450;
+    if (improvement) {
+      const line = improvement.type === 'char'
+        ? `biggest gain: "${improvement.key}" errors ${improvement.before}% → ${improvement.after}%`
+        : `biggest gain: "${improvement.key}" ${improvement.before}ms → ${improvement.after}ms`;
+      ctx.font = '500 14px sans-serif';
+      ctx.fillStyle = hexToRgba(heroColor, 0.8);
+      ctx.textAlign = 'center';
+      ctx.fillText(line, CX, 430);
+      pillY = 468;
+    }
+
+    // ── Stat pill — tests this month ─────────────────────────────────────────
+    const pillW = 220, pillH = 76;
+    const sx = CX - pillW / 2;
+    ctx.fillStyle = hexToRgba(heroColor, 0.07);
+    roundRect(ctx, sx, pillY, pillW, pillH, 14);
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba(heroColor, 0.2);
+    ctx.lineWidth = 1;
+    roundRect(ctx, sx, pillY, pillW, pillH, 14);
+    ctx.stroke();
+
+    ctx.font = '500 11px sans-serif';
+    ctx.fillStyle = heroColor;
+    ctx.textAlign = 'center';
+    ctx.letterSpacing = '0.07em';
+    ctx.fillText('TESTS THIS MONTH', sx + pillW / 2, pillY + 16);
+    ctx.letterSpacing = '0';
+
+    ctx.font = '700 32px monospace';
+    ctx.fillStyle = ink;
+    ctx.textAlign = 'center';
+    ctx.fillText(String(testsThisMonth), sx + pillW / 2, pillY + 32);
+
+    // ── Footer CTA ────────────────────────────────────────────────────────────
+    const footerY = H - 46;
+    ctx.strokeStyle = hexToRgba(inkFaint, 0.15);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(64, footerY - 12);
+    ctx.lineTo(W - 64, footerY - 12);
+    ctx.stroke();
+
+    const preText = 'Track your own progress at  ';
+    const fullText = preText + 'keypace.io';
+    ctx.font = '400 14px sans-serif';
+    const preW = ctx.measureText(preText).width;
+    const fullW = ctx.measureText(fullText).width;
+    ctx.fillStyle = inkFaint;
+    ctx.textAlign = 'left';
+    ctx.fillText(preText, CX - fullW / 2, footerY);
+    ctx.font = '600 14px monospace';
+    ctx.fillStyle = accent;
+    ctx.fillText('keypace.io', CX - fullW / 2 + preW, footerY);
+  }
+
+  // Gathers the same progress numbers the stats page already shows and
+  // opens the share modal with a progress card instead of a single result.
+  function openShareProgress() {
+    const now = Date.now();
+    const DAY = 86400000;
+    const recent = history.filter(h => now - h.date <= 7 * DAY);
+    const recentSample = recent.length ? recent : history.slice(0, 5);
+    const baseline = history.filter(h => now - h.date >= 23 * DAY && now - h.date <= 37 * DAY);
+    const avg = (arr, key) => arr.length ? arr.reduce((a, h) => a + h[key], 0) / arr.length : null;
+    const recentWpm = avg(recentSample, 'wpm');
+    const baseWpm = avg(baseline, 'wpm');
+
+    if (recentWpm == null || baseWpm == null) {
+      // Not enough history for an honest month-over-month comparison —
+      // the share button that calls this is hidden in that case anyway,
+      // but bail safely if it's ever reachable some other way.
+      return;
+    }
+
+    const deltaWpm = Math.round(recentWpm - baseWpm);
+    const testsThisMonth = history.filter(h => now - h.date <= 30 * DAY).length;
+    const improvements = getMostImproved();
+    const topImprovement = improvements && improvements.length ? improvements[0] : null;
+
+    const text = topImprovement
+      ? `I've improved ${deltaWpm >= 0 ? '+' : ''}${deltaWpm} WPM on keypace this month — even my "${topImprovement.key}" ${topImprovement.type === 'char' ? 'accuracy' : 'rhythm'} got noticeably better. 📈`
+      : `I've improved ${deltaWpm >= 0 ? '+' : ''}${deltaWpm} WPM on keypace this month. 📈`;
+    shareMeta = { text, filename: `keypace-progress-${deltaWpm >= 0 ? '+' : ''}${deltaWpm}wpm.png` };
+
+    document.getElementById('shareModalTitle').textContent = 'share your progress';
+    drawProgressShareCard(deltaWpm, testsThisMonth, topImprovement);
+    document.getElementById('shareModal').classList.add('show');
+    const nativeBtn = document.getElementById('shareNativeBtn');
+    nativeBtn.style.display = navigator.share ? 'flex' : 'none';
+  }
+
   let lastResultData = null;
+  // Decouples the native-share/download buttons from assuming a test-result
+  // shape specifically, so other share card types (progress card) can reuse
+  // the same modal/buttons without reconstructing lastResultData's fields.
+  let shareMeta = { text: '', filename: 'keypace-share.png' };
 
   function openShareFromHistory(h) {
     // Populate lastResultData so the native share and download buttons work
@@ -7633,6 +7953,8 @@ COACHING GUIDELINES:
       wpm: h.wpm, acc: h.acc, raw: h.raw || h.wpm,
       mode: h.mode, val: h.val, date: h.date
     };
+    shareMeta = { text: getShareText(h.wpm, h.acc, h.mode, h.val), filename: `keypace-${h.wpm}wpm.png` };
+    document.getElementById('shareModalTitle').textContent = 'share result';
     drawShareCard(h.wpm, h.acc, h.raw || h.wpm, h.mode, h.val, h.date);
     document.getElementById('shareModal').classList.add('show');
     const nativeBtn = document.getElementById('shareNativeBtn');
@@ -7647,6 +7969,8 @@ COACHING GUIDELINES:
   document.getElementById('shareBtn').addEventListener('click', () => {
     if (!lastResultData) return;
     const { wpm, acc, raw, mode, val } = lastResultData;
+    shareMeta = { text: getShareText(wpm, acc, mode, val), filename: `keypace-${wpm}wpm.png` };
+    document.getElementById('shareModalTitle').textContent = 'share result';
     drawShareCard(wpm, acc, raw, mode, val, lastResultData.date);
     document.getElementById('shareModal').classList.add('show');
 
@@ -7654,6 +7978,49 @@ COACHING GUIDELINES:
     // (it does on modern mobile browsers and some desktop ones)
     const nativeBtn = document.getElementById('shareNativeBtn');
     nativeBtn.style.display = navigator.share ? 'flex' : 'none';
+  });
+
+  document.getElementById('shareProgressBtn').addEventListener('click', openShareProgress);
+
+  document.getElementById('challengeBtn').addEventListener('click', async () => {
+    if (!lastResultData) return;
+    const { wpm, acc, mode, val } = lastResultData;
+    // Only time/words modes make sense as a challenge — daily/zen have no
+    // fixed target to beat, and code/punctuation variants would need their
+    // own toggle state carried through too, which the link doesn't encode.
+    if (mode !== 'time' && mode !== 'words') return;
+
+    const name = currentUsername || 'a keypace user';
+    const url = new URL('https://keypace.io/');
+    url.searchParams.set('challenge', '1');
+    url.searchParams.set('cmode', mode);
+    url.searchParams.set('cval', val);
+    url.searchParams.set('cwpm', wpm);
+    if (acc != null) url.searchParams.set('cacc', acc);
+    url.searchParams.set('cn', name.slice(0, 24));
+
+    const modeLabel = mode === 'time' ? `${val}s` : `${val}w`;
+    const text = `I scored ${wpm} WPM on the ${modeLabel} keypace test — think you can beat it? 🏁`;
+    const btn = document.getElementById('challengeBtn');
+    const originalHTML = btn.innerHTML;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ text, url: url.toString() });
+        return;
+      }
+      throw new Error('no native share');
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // user cancelled the share sheet, not a failure
+      try {
+        await navigator.clipboard.writeText(`${text}\n${url.toString()}`);
+        btn.textContent = 'link copied!';
+        setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
+      } catch {
+        btn.textContent = 'copy failed';
+        setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
+      }
+    }
   });
 
   document.getElementById('shareModalCloseBtn').addEventListener('click', () => {
@@ -7668,12 +8035,11 @@ COACHING GUIDELINES:
 
   document.getElementById('shareNativeBtn').addEventListener('click', async () => {
     const canvas = document.getElementById('shareCanvas');
-    const { wpm, acc, mode, val } = lastResultData;
-    const text = getShareText(wpm, acc, mode, val);
+    const text = shareMeta.text;
     const url = 'https://keypace.io';
 
     canvas.toBlob(async (blob) => {
-      const file = new File([blob], `keypace-${wpm}wpm.png`, { type: 'image/png' });
+      const file = new File([blob], shareMeta.filename, { type: 'image/png' });
       try {
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           // Share image + text + link together
@@ -7699,7 +8065,7 @@ COACHING GUIDELINES:
   document.getElementById('shareDownloadBtn').addEventListener('click', () => {
     const canvas = document.getElementById('shareCanvas');
     const a = document.createElement('a');
-    a.download = `keypace-${lastResultData?.wpm || 0}wpm.png`;
+    a.download = shareMeta.filename;
     a.href = canvas.toDataURL('image/png');
     a.click();
   });
