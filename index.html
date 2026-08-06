@@ -3667,6 +3667,7 @@
   // rides in the URL. Parsed here, acted on further down once the DOM/mode
   // buttons exist.
   let pendingChallenge = null;
+  let forcedChallengeWords = null; // set right before accepting a challenge; consumed once by buildTest()
   (function applyModeFromQueryParam() {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -3680,8 +3681,21 @@
         const cwpm = parseInt(params.get('cwpm'), 10);
         const cacc = parseInt(params.get('cacc'), 10);
         const cname = (params.get('cn') || 'someone').slice(0, 24); // bound length, this rides in a URL
+        let cwords = null;
+        const ctext = params.get('ctext');
+        if (ctext) {
+          try {
+            const decoded = b64DecodeUnicode(ctext).trim();
+            if (decoded) cwords = decoded.split(' ').filter(Boolean);
+          } catch {
+            // Corrupted/truncated ctext (e.g. a link mangled by whatever it
+            // was pasted into) — fall back to a freshly generated test for
+            // the right mode/val rather than failing the whole challenge.
+            cwords = null;
+          }
+        }
         if (cmode && (cmode === 'time' || cmode === 'words') && cval > 0 && cwpm > 0) {
-          pendingChallenge = { mode: cmode, val: cval, wpm: cwpm, acc: isNaN(cacc) ? null : cacc, name: cname };
+          pendingChallenge = { mode: cmode, val: cval, wpm: cwpm, acc: isNaN(cacc) ? null : cacc, name: cname, words: cwords };
         }
       }
     } catch {}
@@ -3846,7 +3860,15 @@
   function buildTest() {
     const genOpts = { punctuation: settings.punctuation, numbers: settings.numbers };
 
-    if (state.mode === '_drill') {
+    if (forcedChallengeWords) {
+      // A challenge link supplied the exact word list to use — take
+      // priority over normal generation so both sides of the challenge
+      // type identical text. One-time use: cleared immediately so a
+      // manual restart (Tab) of a NON-challenge test right after doesn't
+      // accidentally reuse it.
+      state.words = forcedChallengeWords;
+      forcedChallengeWords = null;
+    } else if (state.mode === '_drill') {
       // words already set by startDrill()
     } else if (state.mode === '_retest') {
       // words already set by startRetest()
@@ -4611,7 +4633,12 @@
     renderHistory();
 
     // ---- save for share card ----
-    lastResultData = { wpm, acc: accClamped, raw, mode: state.mode, val: state.val, date: Date.now() };
+    // words is captured here (not just mode/val) so a challenge generated
+    // from this result can send the recipient the EXACT same text, not a
+    // freshly randomized list for the same mode/val — randomized word
+    // lists vary in difficulty/character distribution, which isn't a fair
+    // "beat this score" comparison.
+    lastResultData = { wpm, acc: accClamped, raw, mode: state.mode, val: state.val, date: Date.now(), words: state.words.slice() };
 
     // Only time/words results have a fixed target worth challenging someone
     // to beat — daily/zen don't map cleanly onto a "beat this score" link.
@@ -5900,6 +5927,14 @@
       // the field upward without the caret's position being recalculated —
       // exactly the "no visible cursor" bug this fixes.
       banner.style.display = 'none';
+      // If the link carried the exact word list, force buildTest() to use
+      // it instead of generating fresh random words for the same mode/val —
+      // that's what actually makes this a fair, identical-text comparison.
+      // If ctext was missing/corrupted (pendingChallenge.words is null),
+      // this is simply skipped and a normal randomized test runs instead.
+      if (pendingChallenge.words && pendingChallenge.words.length) {
+        forcedChallengeWords = pendingChallenge.words.slice();
+      }
       const targetBtn = modesNav.querySelector(`button[data-mode="${pendingChallenge.mode}"][data-val="${pendingChallenge.val}"]`);
       if (targetBtn) targetBtn.click(); // real mode-switch handler above — correct by construction
       // pendingChallenge itself stays set — the results screen checks it
@@ -7743,9 +7778,18 @@ COACHING GUIDELINES:
 
   document.getElementById('shareProgressBtn').addEventListener('click', openShareProgress);
 
+  // Unicode-safe base64 helpers — punctuation mode can include characters
+  // (em-dashes, curly quotes) that plain btoa() chokes on otherwise.
+  function b64EncodeUnicode(str) {
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode('0x' + p1)));
+  }
+  function b64DecodeUnicode(str) {
+    return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+  }
+
   document.getElementById('challengeBtn').addEventListener('click', async () => {
     if (!lastResultData) return;
-    const { wpm, acc, mode, val } = lastResultData;
+    const { wpm, acc, mode, val, words } = lastResultData;
     // Only time/words modes make sense as a challenge — daily/zen have no
     // fixed target to beat, and code/punctuation variants would need their
     // own toggle state carried through too, which the link doesn't encode.
@@ -7759,6 +7803,18 @@ COACHING GUIDELINES:
     url.searchParams.set('cwpm', wpm);
     if (acc != null) url.searchParams.set('cacc', acc);
     url.searchParams.set('cn', name.slice(0, 24));
+
+    // Send the EXACT text this result was typed on, not just the mode/val —
+    // a freshly randomized word list for the same mode/val isn't a fair
+    // "beat this score" comparison, since word difficulty and character
+    // distribution vary between generations. Capped defensively (a fast
+    // 60s run can extend well past the initial batch) so the URL stays a
+    // sane length; if the recipient somehow runs past the shared words
+    // before time's up, the test's normal extend-with-fresh-words behavior
+    // just takes over, same as it would for anyone typing a long test.
+    if (words && words.length) {
+      url.searchParams.set('ctext', b64EncodeUnicode(words.slice(0, 200).join(' ')));
+    }
 
     const modeLabel = mode === 'time' ? `${val}s` : `${val}w`;
     const text = `I scored ${wpm} WPM on the ${modeLabel} keypace test — think you can beat it? 🏁`;
