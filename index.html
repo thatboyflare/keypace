@@ -3671,7 +3671,6 @@
   // resolveIncomingChallenge() (further down, once SUPABASE_URL exists)
   // does the actual lookup and populates pendingChallenge asynchronously.
   let pendingChallenge = null;
-  let forcedChallengeWords = null; // set right before accepting a challenge; consumed once by buildTest()
   (function applyModeFromQueryParam() {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -3840,14 +3839,17 @@
   function buildTest() {
     const genOpts = { punctuation: settings.punctuation, numbers: settings.numbers };
 
-    if (forcedChallengeWords) {
-      // A challenge link supplied the exact word list to use — take
-      // priority over normal generation so both sides of the challenge
-      // type identical text. One-time use: cleared immediately so a
-      // manual restart (Tab) of a NON-challenge test right after doesn't
-      // accidentally reuse it.
-      state.words = forcedChallengeWords;
-      forcedChallengeWords = null;
+    if (pendingChallenge && pendingChallenge.words && pendingChallenge.words.length &&
+        pendingChallenge.mode === state.mode && pendingChallenge.val === state.val) {
+      // Actively attempting a challenge whose word list is known — use it
+      // every time buildTest() runs for this exact mode/val, not just the
+      // first time. This intentionally does NOT consume/clear anything, so
+      // restarting mid-attempt (Tab) keeps the identical text instead of
+      // reverting to a freshly randomized set. It naturally stops applying
+      // once the challenge is actually completed, since the results screen
+      // sets pendingChallenge back to null at that point — or if the user
+      // switches to a different mode/val, since the check above won't match.
+      state.words = pendingChallenge.words.slice();
     } else if (state.mode === '_drill') {
       // words already set by startDrill()
     } else if (state.mode === '_retest') {
@@ -5991,14 +5993,10 @@
       // the field upward without the caret's position being recalculated —
       // exactly the "no visible cursor" bug this fixes.
       banner.style.display = 'none';
-      // If the link carried the exact word list, force buildTest() to use
-      // it instead of generating fresh random words for the same mode/val —
-      // that's what actually makes this a fair, identical-text comparison.
-      // If the payload was missing/corrupted (pendingChallenge.words is
-      // null), this is simply skipped and a normal randomized test runs.
-      if (pendingChallenge.words && pendingChallenge.words.length) {
-        forcedChallengeWords = pendingChallenge.words.slice();
-      }
+      // buildTest() (triggered by the click below) checks pendingChallenge
+      // directly and uses its word list whenever the mode/val match — no
+      // separate flag needed here, and that's what lets a restart (Tab)
+      // mid-attempt keep the same text instead of reverting to random.
       const targetBtn = modesNav.querySelector(`button[data-mode="${pendingChallenge.mode}"][data-val="${pendingChallenge.val}"]`);
       if (targetBtn) targetBtn.click(); // real mode-switch handler above — correct by construction
       // pendingChallenge itself stays set — the results screen checks it
