@@ -1082,6 +1082,48 @@
   .challenge-result b { color: var(--ink); }
   .challenge-result.lost { border-left-color: var(--accent); }
 
+  /* ---------- duel notifications (creator gets pinged when someone completes their challenge) ---------- */
+  .duel-notifications {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 250;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 320px;
+  }
+  .duel-notif-card {
+    background: var(--panel);
+    border: 1px solid var(--good);
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    animation: rise 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+  }
+  .duel-notif-card.lost { border-color: var(--accent); }
+  .duel-notif-close {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: var(--ink-faint);
+    cursor: pointer;
+    font-size: 17px;
+    line-height: 1;
+    padding: 4px;
+  }
+  .duel-notif-close:hover { color: var(--ink); }
+  .duel-notif-text {
+    font-size: 13px;
+    color: var(--ink-dim);
+    padding-right: 18px;
+    line-height: 1.5;
+  }
+  .duel-notif-text b { color: var(--ink); }
+
   .capslock-warning {
     display: none;
     align-items: center;
@@ -1796,6 +1838,42 @@
     text-align: center;
     padding: 16px 0;
   }
+
+  /* ---------- duels tab ---------- */
+  .duels-empty {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    color: var(--ink-faint);
+    text-align: center;
+    padding: 32px 16px;
+    line-height: 1.6;
+  }
+  .duel-record-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+  .duel-record-name {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 14px;
+  }
+  .duel-record-score {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    display: flex;
+    gap: 10px;
+  }
+  .duel-record-score .wins { color: var(--good); font-weight: 700; }
+  .duel-record-score .losses { color: var(--error); font-weight: 700; }
+  .duel-record-score .ties { color: var(--ink-faint); }
 
   .lb-row {
     display: flex;
@@ -3386,6 +3464,7 @@
     <div class="perf-tabs">
       <button class="perf-tab active" data-tab="stats">my stats</button>
       <button class="perf-tab" data-tab="leaderboard">leaderboard</button>
+      <button class="perf-tab" data-tab="duels">duels</button>
     </div>
 
     <!-- My stats tab -->
@@ -3467,6 +3546,11 @@
       <div class="lb-signin-prompt" id="lbSigninPrompt" style="display:none">
         Sign in and set a username to appear on the leaderboard.
       </div>
+    </div>
+
+    <!-- Duels tab — head-to-head records against people you've challenged -->
+    <div class="perf-tab-panel" id="perfTabDuels" style="display:none">
+      <div id="duelsContent"></div>
     </div>
   </div>
 
@@ -4629,21 +4713,45 @@
 
     // If this test was taken specifically to accept a friend's challenge
     // (same mode + val as pendingChallenge), show the win/lose comparison
-    // once, then clear it so it doesn't reappear on unrelated later tests.
+    // once, record the result, and block this exact challenge from being
+    // retaken (see isChallengeAlreadyCompleted / markChallengeCompletedLocal).
     const challengeResultEl = document.getElementById('challengeResult');
     if (challengeResultEl) {
       if (pendingChallenge && pendingChallenge.mode === state.mode && pendingChallenge.val === state.val) {
         const won = wpm > pendingChallenge.wpm;
         const tied = wpm === pendingChallenge.wpm;
+        const outcome = tied ? 'tie' : (won ? 'acceptor_win' : 'creator_win');
+
         challengeResultEl.className = 'challenge-result' + (won ? '' : ' lost');
         challengeResultEl.style.display = '';
         if (tied) {
-          challengeResultEl.innerHTML = `Dead even with <b>${escHtml(pendingChallenge.name)}</b> — both at <b>${wpm} wpm</b>. Run it back?`;
+          challengeResultEl.innerHTML = `Dead even with <b>${escHtml(pendingChallenge.name)}</b> — both at <b>${wpm} wpm</b>.`;
         } else if (won) {
           challengeResultEl.innerHTML = `You beat <b>${escHtml(pendingChallenge.name)}</b>'s <b>${pendingChallenge.wpm} wpm</b> with <b>${wpm} wpm</b>! 🎉`;
         } else {
-          challengeResultEl.innerHTML = `<b>${escHtml(pendingChallenge.name)}</b>'s <b>${pendingChallenge.wpm} wpm</b> still stands — you got <b>${wpm} wpm</b>. Try again?`;
+          challengeResultEl.innerHTML = `<b>${escHtml(pendingChallenge.name)}</b>'s <b>${pendingChallenge.wpm} wpm</b> still stands — you got <b>${wpm} wpm</b>.`;
         }
+
+        // Record before clearing pendingChallenge — needs its code/name/
+        // creatorUserId. Fire-and-forget: the local completion flag below
+        // is what actually blocks a retake even if this network call is
+        // slow or fails; the server record is what additionally enables
+        // cross-device blocking, creator notification, and duel history.
+        recordDuelResult({
+          challenge_code: pendingChallenge.code,
+          creator_user_id: pendingChallenge.creatorUserId,
+          creator_name: pendingChallenge.name,
+          creator_wpm: pendingChallenge.wpm,
+          mode: state.mode,
+          val: state.val,
+          acceptor_user_id: authSession ? authSession.user.id : null,
+          acceptor_name: currentUsername || 'a keypace user',
+          acceptor_wpm: wpm,
+          acceptor_acc: accClamped,
+          outcome,
+        }).catch(() => {});
+        markChallengeCompletedLocal(pendingChallenge.code);
+
         pendingChallenge = null; // one-time comparison
       } else {
         challengeResultEl.style.display = 'none';
@@ -5833,6 +5941,118 @@
     return JSON.parse(rows[0].data);
   }
 
+  // ---------------- duel results (completed attempts) ----------------
+  // Separate table from `challenges` (which just stores the shareable
+  // payload) — one row per completed attempt, since a single link could in
+  // principle be accepted by more than one person. Powers three things:
+  // preventing a challenge from being retaken after completion, notifying
+  // the creator of the outcome, and a persistent head-to-head record.
+  const DUEL_RESULTS_ENDPOINT = `${SUPABASE_URL}/rest/v1/duel_results`;
+  const COMPLETED_CHALLENGES_KEY = 'keypace_completed_challenges_v1';
+
+  function loadCompletedChallengesLocal() {
+    try { return new Set(JSON.parse(localStorage.getItem(COMPLETED_CHALLENGES_KEY)) || []); }
+    catch { return new Set(); }
+  }
+  function markChallengeCompletedLocal(code) {
+    const set = loadCompletedChallengesLocal();
+    set.add(code);
+    try { localStorage.setItem(COMPLETED_CHALLENGES_KEY, JSON.stringify([...set])); } catch {}
+  }
+
+  // Hybrid check: a local flag always applies first (cheap, works offline,
+  // and is the ONLY thing that can work for an anonymous acceptor with no
+  // server-side identity). Signed-in users additionally get a real
+  // server-side check, which is what makes the block actually hold across
+  // devices/browsers for an account rather than just the one that took it.
+  async function isChallengeAlreadyCompleted(code) {
+    if (loadCompletedChallengesLocal().has(code)) return true;
+    if (!authSession) return false;
+    try {
+      const res = await fetch(
+        `${DUEL_RESULTS_ENDPOINT}?challenge_code=eq.${encodeURIComponent(code)}&acceptor_user_id=eq.${authSession.user.id}&select=id&limit=1`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+      );
+      if (!res.ok) return false;
+      const rows = await res.json();
+      return rows.length > 0;
+    } catch { return false; }
+  }
+
+  async function recordDuelResult(payload) {
+    try {
+      const res = await fetch(DUEL_RESULTS_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify(payload),
+      });
+      return res.ok;
+    } catch { return false; }
+  }
+
+  // Only meaningful for a signed-in creator — there's no way to reach an
+  // anonymous creator later, since there's nothing stable to look them up
+  // by. Called once after sign-in / on load for an already-signed-in user.
+  async function fetchPendingDuelNotifications() {
+    if (!authSession) return [];
+    try {
+      const res = await authFetch(
+        `${DUEL_RESULTS_ENDPOINT}?creator_user_id=eq.${authSession.user.id}&creator_notified=eq.false&select=id,acceptor_name,acceptor_wpm,creator_wpm,mode,val,outcome&order=completed_at.desc`,
+        {}, true
+      );
+      if (!res.ok) return [];
+      return await res.json();
+    } catch { return []; }
+  }
+
+  async function markDuelNotified(id) {
+    try {
+      await authFetch(`${DUEL_RESULTS_ENDPOINT}?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ creator_notified: true }),
+      }, true);
+    } catch {}
+  }
+
+  // Raw history for the current signed-in user, aggregated client-side
+  // into per-opponent win/loss/tie records by the duel-tracking panel.
+  // Matches by display name (not just user_id) since an opponent might
+  // have been anonymous — name is the only thing guaranteed present on
+  // both sides of every duel.
+  async function fetchDuelHistory() {
+    if (!currentUsername) return [];
+    try {
+      const name = encodeURIComponent(currentUsername);
+      const res = await fetch(
+        `${DUEL_RESULTS_ENDPOINT}?or=(creator_name.eq.${name},acceptor_name.eq.${name})&select=creator_name,creator_wpm,acceptor_name,acceptor_wpm,outcome,mode,val,completed_at&order=completed_at.desc&limit=300`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+      );
+      if (!res.ok) return [];
+      return await res.json();
+    } catch { return []; }
+  }
+
+  function aggregateDuelRecords(rows, myName) {
+    const records = new Map(); // opponent name -> { wins, losses, ties, lastPlayed }
+    rows.forEach(r => {
+      const iAmCreator = r.creator_name === myName;
+      const opponent = iAmCreator ? r.acceptor_name : r.creator_name;
+      if (!opponent || opponent === myName) return; // skip malformed/self rows
+      if (!records.has(opponent)) records.set(opponent, { wins: 0, losses: 0, ties: 0, lastPlayed: r.completed_at });
+      const rec = records.get(opponent);
+      if (r.outcome === 'tie') rec.ties++;
+      else if ((iAmCreator && r.outcome === 'creator_win') || (!iAmCreator && r.outcome === 'acceptor_win')) rec.wins++;
+      else rec.losses++;
+    });
+    return records;
+  }
+
   // Checks the URL for an incoming challenge code and, if present, fetches
   // its payload and hands off to activateChallengeBanner() (defined further
   // down, once the mode buttons/banner DOM exist). Fails silently from the
@@ -5845,13 +6065,19 @@
       if (!code) return;
       const payload = await downloadChallenge(code);
       if (!payload || (payload.mode !== 'time' && payload.mode !== 'words') || !(payload.val > 0) || !(payload.wpm > 0)) return;
+
+      const alreadyDone = await isChallengeAlreadyCompleted(code);
+
       pendingChallenge = {
+        code,
         mode: payload.mode,
         val: payload.val,
         wpm: payload.wpm,
         acc: (typeof payload.acc === 'number') ? payload.acc : null,
         name: (payload.name || 'someone').slice(0, 24),
-        words: (Array.isArray(payload.words) && payload.words.length) ? payload.words : null,
+        creatorUserId: payload.creatorUserId || null,
+        words: (!alreadyDone && Array.isArray(payload.words) && payload.words.length) ? payload.words : null,
+        completed: alreadyDone,
       };
       activateChallengeBanner();
     } catch (err) {
@@ -5978,12 +6204,26 @@
     const banner = document.getElementById('challengeBanner');
     const label = document.getElementById('challengeBannerLabel');
     const goal = document.getElementById('challengeBannerGoal');
+    const acceptBtn = document.getElementById('challengeBannerAccept');
     const modeLabel = pendingChallenge.mode === 'time' ? `${pendingChallenge.val}s` : `${pendingChallenge.val}w`;
+
+    if (pendingChallenge.completed) {
+      // Already taken this exact challenge — informational only, no way to
+      // retake it. Repeat-prevention would be pointless if the banner
+      // still let you click through to another attempt.
+      label.textContent = `you already took ${pendingChallenge.name}'s challenge`;
+      goal.textContent = `target was ${pendingChallenge.wpm} wpm on the ${modeLabel} test`;
+      acceptBtn.style.display = 'none';
+      banner.style.display = '';
+      return;
+    }
+
     label.textContent = `${pendingChallenge.name} challenged you`;
     goal.textContent = `beat ${pendingChallenge.wpm} wpm on the ${modeLabel} test`;
+    acceptBtn.style.display = '';
     banner.style.display = '';
 
-    document.getElementById('challengeBannerAccept').addEventListener('click', () => {
+    acceptBtn.addEventListener('click', () => {
       // Hide the banner FIRST — buildTest() (triggered by the click below)
       // measures the field's actual on-screen position to place the caret,
       // and getBoundingClientRect() forces the browser to lay out
@@ -6351,6 +6591,7 @@
       await pushStats();
       await syncExistingBestsToLeaderboard();
       await syncStreakFromServer();
+      await checkAndShowDuelNotifications();
       status.textContent = 'Signed in — stats sync automatically.';
       status.className = 'sync-result show success';
     } catch (e) {
@@ -6412,6 +6653,7 @@
       await pullStats();
       await pushStats();
       await syncStreakFromServer();
+      await checkAndShowDuelNotifications();
       status.textContent = 'All synced!';
       status.className = 'sync-result show success';
     } catch (e) {
@@ -6470,12 +6712,52 @@
     }, true); // suppressClear — background sync, don't log out on failure
   }
 
+  // Shows any pending "someone completed your challenge" notifications as
+  // dismissible cards. Only ever has anything to show for a signed-in
+  // creator — fetchPendingDuelNotifications() already returns empty
+  // otherwise, so this is safe to call unconditionally.
+  async function checkAndShowDuelNotifications() {
+    const pending = await fetchPendingDuelNotifications();
+    if (!pending.length) return;
+
+    let container = document.getElementById('duelNotifications');
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'duel-notifications';
+      container.id = 'duelNotifications';
+      document.body.appendChild(container);
+    }
+
+    pending.forEach(n => {
+      const won = n.outcome === 'creator_win';
+      const tied = n.outcome === 'tie';
+      const modeLabel = n.mode === 'time' ? `${n.val}s` : `${n.val}w`;
+      const card = document.createElement('div');
+      card.className = 'duel-notif-card' + (won ? '' : (tied ? '' : ' lost'));
+      const text = tied
+        ? `<b>${escHtml(n.acceptor_name)}</b> tied your ${modeLabel} challenge — both at <b>${n.acceptor_wpm} wpm</b>.`
+        : won
+          ? `<b>${escHtml(n.acceptor_name)}</b> tried your ${modeLabel} challenge and fell short — ${n.acceptor_wpm} wpm vs your ${n.creator_wpm} wpm. 💪`
+          : `<b>${escHtml(n.acceptor_name)}</b> beat your ${modeLabel} challenge! ${n.acceptor_wpm} wpm vs your ${n.creator_wpm} wpm. 🏆`;
+      card.innerHTML = `
+        <button class="duel-notif-close" title="Dismiss">×</button>
+        <div class="duel-notif-text">${text}</div>
+      `;
+      card.querySelector('.duel-notif-close').addEventListener('click', () => {
+        card.remove();
+        markDuelNotified(n.id);
+      });
+      container.appendChild(card);
+    });
+  }
+
   // Auto-sync on page load if already signed in
   if (authSession) {
     pullStats().then(async () => {
       await pushStats();
       await syncExistingBestsToLeaderboard();
       await syncStreakFromServer();
+      await checkAndShowDuelNotifications();
     }).catch(() => {});
   }
 
@@ -7868,6 +8150,11 @@ COACHING GUIDELINES:
         acc: (acc != null) ? acc : null,
         name: name.slice(0, 24),
         words: (words && words.length) ? words.slice(0, 200) : null,
+        // Only set when signed in — this is what makes a later notification
+        // possible at all. An anonymous creator has no stable identity to
+        // notify, so their challenge still works fine, it just can't ping
+        // them back with the result.
+        creatorUserId: authSession ? authSession.user.id : null,
       };
       const code = await uploadChallenge(payload);
 
@@ -9694,6 +9981,37 @@ Rules:
     }
   }
 
+  // Renders the head-to-head record against everyone the signed-in user
+  // has ever dueled, aggregated from duel_results. Requires a username —
+  // matching is done by display name (see aggregateDuelRecords), which is
+  // the only identifier guaranteed present on both sides of every duel,
+  // including ones against an anonymous opponent.
+  async function renderDuelsTab() {
+    const container = document.getElementById('duelsContent');
+    if (!currentUsername) {
+      container.innerHTML = `<div class="duels-empty">Sign in and set a username to track your head-to-head record against people you challenge.</div>`;
+      return;
+    }
+    container.innerHTML = `<div class="lb-loading">loading…</div>`;
+    const rows = await fetchDuelHistory();
+    if (!rows.length) {
+      container.innerHTML = `<div class="duels-empty">No duels yet — challenge a friend from your results screen to start a head-to-head record.</div>`;
+      return;
+    }
+    const records = aggregateDuelRecords(rows, currentUsername);
+    const sorted = [...records.entries()].sort((a, b) => new Date(b[1].lastPlayed) - new Date(a[1].lastPlayed));
+    container.innerHTML = sorted.map(([name, rec]) => `
+      <div class="duel-record-row">
+        <div class="duel-record-name">${escHtml(name)}</div>
+        <div class="duel-record-score">
+          <span class="wins">${rec.wins}W</span>
+          <span class="losses">${rec.losses}L</span>
+          ${rec.ties ? `<span class="ties">${rec.ties}T</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
   // Tab switching
   document.querySelectorAll('.perf-tab').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -9702,7 +10020,9 @@ Rules:
       const tab = btn.dataset.tab;
       document.getElementById('perfTabStats').style.display        = tab === 'stats'       ? '' : 'none';
       document.getElementById('perfTabLeaderboard').style.display  = tab === 'leaderboard' ? '' : 'none';
+      document.getElementById('perfTabDuels').style.display        = tab === 'duels'       ? '' : 'none';
       if (tab === 'leaderboard') loadLeaderboardTab(lbCurrentMode);
+      if (tab === 'duels') renderDuelsTab();
     });
   });
 
