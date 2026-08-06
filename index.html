@@ -3663,9 +3663,13 @@
   // overrides the mode setting itself, never anything auth/data-related.
   //
   // A "challenge" link works the same way but for mode+val together, plus
-  // a name and score to beat — no backend/accounts needed, the whole thing
-  // rides in the URL. Parsed here, acted on further down once the DOM/mode
-  // buttons exist.
+  // a name and score to beat. Challenge data is stored server-side under a
+  // short code (see uploadChallenge/downloadChallenge near the Supabase
+  // constants below) — the URL only ever carries `?challenge=<code>`, not
+  // the full mode/score/word-list payload, which made links absurdly long
+  // (1000+ chars) once the exact word list was included for fairness.
+  // resolveIncomingChallenge() (further down, once SUPABASE_URL exists)
+  // does the actual lookup and populates pendingChallenge asynchronously.
   let pendingChallenge = null;
   let forcedChallengeWords = null; // set right before accepting a challenge; consumed once by buildTest()
   (function applyModeFromQueryParam() {
@@ -3674,30 +3678,6 @@
       const qp = params.get('mode');
       if (qp === 'code') { settings.code = true; settings.punctuation = false; settings.numbers = false; }
       else if (qp === 'punctuation') { settings.punctuation = true; settings.code = false; }
-
-      if (params.get('challenge') === '1') {
-        const cmode = params.get('cmode');
-        const cval = parseInt(params.get('cval'), 10);
-        const cwpm = parseInt(params.get('cwpm'), 10);
-        const cacc = parseInt(params.get('cacc'), 10);
-        const cname = (params.get('cn') || 'someone').slice(0, 24); // bound length, this rides in a URL
-        let cwords = null;
-        const ctext = params.get('ctext');
-        if (ctext) {
-          try {
-            const decoded = b64DecodeUnicode(ctext).trim();
-            if (decoded) cwords = decoded.split(' ').filter(Boolean);
-          } catch {
-            // Corrupted/truncated ctext (e.g. a link mangled by whatever it
-            // was pasted into) — fall back to a freshly generated test for
-            // the right mode/val rather than failing the whole challenge.
-            cwords = null;
-          }
-        }
-        if (cmode && (cmode === 'time' || cmode === 'words') && cval > 0 && cwpm > 0) {
-          pendingChallenge = { mode: cmode, val: cval, wpm: cwpm, acc: isNaN(cacc) ? null : cacc, name: cname, words: cwords };
-        }
-      }
     } catch {}
   })();
 
@@ -5795,6 +5775,89 @@
   const SUPABASE_URL = 'https://qtyyhiknmykzmlninrzq.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_BtyZysapta_GtPdi8zfSOA_UNMzBxM9';
 
+  // ---------------- challenge links (short-code storage) ----------------
+  // Backed by a small Supabase table (challenges: code text primary key,
+  // data text, created_at timestamptz). Same RLS posture as other public
+  // write-once tables in this app: anon insert + select only, no update/
+  // delete, no "list all" query anywhere — a code has to already be known
+  // to read it back. Storing the payload server-side under a short code
+  // (rather than encoding mode/score/word-list directly into the URL) is
+  // what keeps challenge links short — the word list alone made the old
+  // all-in-URL version over 1000 characters for a typical test.
+  const CHALLENGES_TABLE_ENDPOINT = `${SUPABASE_URL}/rest/v1/challenges`;
+
+  function generateChallengeCode() {
+    // Unlike the old cross-device sync codes, nobody ever types this by
+    // hand — it only ever rides in a URL — so a short random alphanumeric
+    // string is better here than the word-based codes used elsewhere.
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let code = '';
+    for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+  }
+
+  async function uploadChallenge(payload) {
+    const data = JSON.stringify(payload);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = generateChallengeCode();
+      const res = await fetch(CHALLENGES_TABLE_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({ code, data }),
+      });
+      if (res.ok) return code;
+      if (res.status !== 409) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Upload failed (${res.status}): ${text || 'unknown error'}`);
+      }
+      // 409 = code collision (vanishingly unlikely at 8 random chars) — loop and retry.
+    }
+    throw new Error('Could not generate a unique challenge code.');
+  }
+
+  async function downloadChallenge(code) {
+    const url = `${CHALLENGES_TABLE_ENDPOINT}?code=eq.${encodeURIComponent(code)}&select=data`;
+    const res = await fetch(url, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) throw new Error(`Lookup failed (${res.status})`);
+    const rows = await res.json();
+    if (!rows.length) throw new Error('Challenge not found — the link may be invalid or expired.');
+    return JSON.parse(rows[0].data);
+  }
+
+  // Checks the URL for an incoming challenge code and, if present, fetches
+  // its payload and hands off to activateChallengeBanner() (defined further
+  // down, once the mode buttons/banner DOM exist). Fails silently from the
+  // user's perspective on any error — worst case they just land on the
+  // normal homepage instead of seeing a challenge banner, rather than the
+  // whole page breaking over a bad/expired link.
+  async function resolveIncomingChallenge() {
+    try {
+      const code = new URLSearchParams(window.location.search).get('challenge');
+      if (!code) return;
+      const payload = await downloadChallenge(code);
+      if (!payload || (payload.mode !== 'time' && payload.mode !== 'words') || !(payload.val > 0) || !(payload.wpm > 0)) return;
+      pendingChallenge = {
+        mode: payload.mode,
+        val: payload.val,
+        wpm: payload.wpm,
+        acc: (typeof payload.acc === 'number') ? payload.acc : null,
+        name: (payload.name || 'someone').slice(0, 24),
+        words: (Array.isArray(payload.words) && payload.words.length) ? payload.words : null,
+      };
+      activateChallengeBanner();
+    } catch (err) {
+      console.warn('Could not load challenge link:', err.message);
+    }
+  }
+  resolveIncomingChallenge();
+
   function applySettingsToUI() {
     togglePunct.classList.toggle('active', settings.punctuation);
     toggleNums.classList.toggle('active', settings.numbers);
@@ -5902,13 +5965,14 @@
   });
 
   // ---------------- challenge links ----------------
-  // pendingChallenge (parsed from the URL in the query-param IIFE near the
-  // top of this script) rides entirely in the link — no accounts, no
-  // backend. If present, show a banner naming the challenge; accepting it
+  // Called by resolveIncomingChallenge() (defined earlier, near the
+  // Supabase constants) once an incoming challenge code has actually been
+  // fetched — not synchronously on page load, since that now requires a
+  // network round-trip. Shows a banner naming the challenge; accepting it
   // switches to the exact mode by clicking the real mode button (so all the
   // normal mode-switch logic — saving, rebuilding — runs correctly, rather
   // than duplicating it here) instead of just hiding the banner.
-  if (pendingChallenge) {
+  function activateChallengeBanner() {
     const banner = document.getElementById('challengeBanner');
     const label = document.getElementById('challengeBannerLabel');
     const goal = document.getElementById('challengeBannerGoal');
@@ -5930,8 +5994,8 @@
       // If the link carried the exact word list, force buildTest() to use
       // it instead of generating fresh random words for the same mode/val —
       // that's what actually makes this a fair, identical-text comparison.
-      // If ctext was missing/corrupted (pendingChallenge.words is null),
-      // this is simply skipped and a normal randomized test runs instead.
+      // If the payload was missing/corrupted (pendingChallenge.words is
+      // null), this is simply skipped and a normal randomized test runs.
       if (pendingChallenge.words && pendingChallenge.words.length) {
         forcedChallengeWords = pendingChallenge.words.slice();
       }
@@ -7778,15 +7842,6 @@ COACHING GUIDELINES:
 
   document.getElementById('shareProgressBtn').addEventListener('click', openShareProgress);
 
-  // Unicode-safe base64 helpers — punctuation mode can include characters
-  // (em-dashes, curly quotes) that plain btoa() chokes on otherwise.
-  function b64EncodeUnicode(str) {
-    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode('0x' + p1)));
-  }
-  function b64DecodeUnicode(str) {
-    return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-  }
-
   document.getElementById('challengeBtn').addEventListener('click', async () => {
     if (!lastResultData) return;
     const { wpm, acc, mode, val, words } = lastResultData;
@@ -7795,48 +7850,53 @@ COACHING GUIDELINES:
     // own toggle state carried through too, which the link doesn't encode.
     if (mode !== 'time' && mode !== 'words') return;
 
-    const name = currentUsername || 'a keypace user';
-    const url = new URL('https://keypace.io/');
-    url.searchParams.set('challenge', '1');
-    url.searchParams.set('cmode', mode);
-    url.searchParams.set('cval', val);
-    url.searchParams.set('cwpm', wpm);
-    if (acc != null) url.searchParams.set('cacc', acc);
-    url.searchParams.set('cn', name.slice(0, 24));
-
-    // Send the EXACT text this result was typed on, not just the mode/val —
-    // a freshly randomized word list for the same mode/val isn't a fair
-    // "beat this score" comparison, since word difficulty and character
-    // distribution vary between generations. Capped defensively (a fast
-    // 60s run can extend well past the initial batch) so the URL stays a
-    // sane length; if the recipient somehow runs past the shared words
-    // before time's up, the test's normal extend-with-fresh-words behavior
-    // just takes over, same as it would for anyone typing a long test.
-    if (words && words.length) {
-      url.searchParams.set('ctext', b64EncodeUnicode(words.slice(0, 200).join(' ')));
-    }
-
-    const modeLabel = mode === 'time' ? `${val}s` : `${val}w`;
-    const text = `I scored ${wpm} WPM on the ${modeLabel} keypace test — think you can beat it? 🏁`;
     const btn = document.getElementById('challengeBtn');
     const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = 'creating link…';
 
     try {
-      if (navigator.share) {
-        await navigator.share({ text, url: url.toString() });
-        return;
-      }
-      throw new Error('no native share');
-    } catch (err) {
-      if (err && err.name === 'AbortError') return; // user cancelled the share sheet, not a failure
+      const name = currentUsername || 'a keypace user';
+      // The exact word list this result was typed on goes in the stored
+      // payload, not the URL — a freshly randomized list for the same
+      // mode/val isn't a fair "beat this score" comparison, since word
+      // difficulty and character distribution vary between generations.
+      // Capped defensively (a fast 60s run can extend well past the
+      // initial batch); if the recipient runs past the shared words before
+      // time's up, the test's normal extend-with-fresh-words behavior just
+      // takes over, same as it would for anyone typing a long test.
+      const payload = {
+        mode, val, wpm,
+        acc: (acc != null) ? acc : null,
+        name: name.slice(0, 24),
+        words: (words && words.length) ? words.slice(0, 200) : null,
+      };
+      const code = await uploadChallenge(payload);
+
+      const url = new URL('https://keypace.io/');
+      url.searchParams.set('challenge', code);
+
+      const modeLabel = mode === 'time' ? `${val}s` : `${val}w`;
+      const text = `I scored ${wpm} WPM on the ${modeLabel} keypace test — think you can beat it? 🏁`;
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+
       try {
+        if (navigator.share) {
+          await navigator.share({ text, url: url.toString() });
+          return;
+        }
+        throw new Error('no native share');
+      } catch (err) {
+        if (err && err.name === 'AbortError') return; // user cancelled the share sheet, not a failure
         await navigator.clipboard.writeText(`${text}\n${url.toString()}`);
         btn.textContent = 'link copied!';
         setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
-      } catch {
-        btn.textContent = 'copy failed';
-        setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
       }
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'could not create link';
+      setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
     }
   });
 
