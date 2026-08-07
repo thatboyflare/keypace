@@ -1082,6 +1082,14 @@
   .challenge-result b { color: var(--ink); }
   .challenge-result.lost { border-left-color: var(--accent); }
 
+  .duel-by-name-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    max-width: 320px;
+  }
+  .duel-by-name-row .sync-code-input { flex: 1; margin-top: 0; margin-bottom: 0; }
+
   /* ---------- duel notifications (creator gets pinged when someone completes their challenge) ---------- */
   .duel-notifications {
     position: fixed;
@@ -3453,6 +3461,16 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
           challenge a friend
         </button>
+        <button class="btn" id="duelByNameBtn" title="Send this result directly to a known username — no link needed">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          duel by username
+        </button>
+      </div>
+
+      <!-- Inline username input, revealed by the "duel by username" toggle above -->
+      <div class="duel-by-name-row" id="duelByNameRow" style="display:none">
+        <input type="text" id="duelByNameInput" class="sync-code-input" placeholder="their username" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+        <button class="btn primary" id="duelByNameSendBtn">send</button>
       </div>
 
       <!-- Shown only when this result completed a challenge someone sent you -->
@@ -4777,6 +4795,15 @@
     // to beat — daily/zen don't map cleanly onto a "beat this score" link.
     const challengeBtnEl = document.getElementById('challengeBtn');
     if (challengeBtnEl) challengeBtnEl.style.display = (state.mode === 'time' || state.mode === 'words') ? '' : 'none';
+
+    // Same mode gating as the link-based button, plus requires being
+    // signed in — sending a direct request needs the sender's own known
+    // identity, not just the target's.
+    const duelByNameBtnEl = document.getElementById('duelByNameBtn');
+    const canDuelByName = (state.mode === 'time' || state.mode === 'words') && !!authSession;
+    if (duelByNameBtnEl) duelByNameBtnEl.style.display = canDuelByName ? '' : 'none';
+    const duelByNameRowEl = document.getElementById('duelByNameRow');
+    if (duelByNameRowEl) duelByNameRowEl.style.display = 'none'; // reset closed on every fresh result
 
     // If this test was taken specifically to accept a friend's challenge
     // (same mode + val as pendingChallenge), show the win/lose comparison
@@ -8417,6 +8444,74 @@ COACHING GUIDELINES:
       btn.textContent = 'could not create link';
       setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
     }
+  });
+
+  // Toggle the inline username input open/closed
+  document.getElementById('duelByNameBtn').addEventListener('click', () => {
+    const row = document.getElementById('duelByNameRow');
+    const input = document.getElementById('duelByNameInput');
+    const opening = row.style.display === 'none';
+    row.style.display = opening ? 'flex' : 'none';
+    if (opening) input.focus();
+  });
+
+  // Sends the just-completed result directly to a known username — same
+  // payload shape as the link-based challenge, just delivered as a
+  // notification (via target_user_id) instead of a shareable URL. Doesn't
+  // require any prior duel history with that person, unlike "duel again"
+  // in the duels tab, which only ever lists past opponents.
+  async function sendDuelByUsername() {
+    if (!lastResultData) return;
+    const { wpm, acc, mode, val, words } = lastResultData;
+    if (mode !== 'time' && mode !== 'words') return;
+
+    const input = document.getElementById('duelByNameInput');
+    const targetName = input.value.trim();
+    if (!targetName) return;
+
+    const sendBtn = document.getElementById('duelByNameSendBtn');
+    const originalText = sendBtn.textContent;
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'sending…';
+
+    const duelSentEl = document.getElementById('duelRequestSent');
+
+    try {
+      const targetUserId = await lookupUserIdByUsername(targetName);
+      if (!targetUserId) {
+        duelSentEl.className = 'challenge-result lost';
+        duelSentEl.style.display = '';
+        duelSentEl.innerHTML = `Couldn't find a user named <b>${escHtml(targetName)}</b> — check the spelling?`;
+        return;
+      }
+
+      const payload = {
+        mode, val, wpm,
+        acc: (acc != null) ? acc : null,
+        name: (currentUsername || 'a keypace user').slice(0, 24),
+        words: (words && words.length) ? words.slice(0, 200) : null,
+        creatorUserId: authSession ? authSession.user.id : null,
+      };
+      await uploadChallenge(payload, targetUserId);
+
+      duelSentEl.className = 'challenge-result';
+      duelSentEl.style.display = '';
+      duelSentEl.innerHTML = `Duel request sent to <b>${escHtml(targetName)}</b> — beat <b>${wpm} wpm</b>.`;
+      document.getElementById('duelByNameRow').style.display = 'none';
+      input.value = '';
+    } catch (err) {
+      duelSentEl.className = 'challenge-result lost';
+      duelSentEl.style.display = '';
+      duelSentEl.innerHTML = `Couldn't send the duel request — try again in a moment.`;
+    } finally {
+      sendBtn.disabled = false;
+      sendBtn.textContent = originalText;
+    }
+  }
+
+  document.getElementById('duelByNameSendBtn').addEventListener('click', sendDuelByUsername);
+  document.getElementById('duelByNameInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); sendDuelByUsername(); }
   });
 
   document.getElementById('shareModalCloseBtn').addEventListener('click', () => {
