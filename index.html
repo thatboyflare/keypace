@@ -591,6 +591,60 @@
     word-break: break-all;
   }
 
+  .account-achievements-preview {
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 0;
+    margin-bottom: 4px;
+  }
+  .aap-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .aap-title {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .aap-count {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+  }
+  .aap-icons {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .aap-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    flex-shrink: 0;
+  }
+  .aap-icon.tier-bronze { border-color: #cd7f32; }
+  .aap-icon.tier-silver { border-color: #c0c0c0; }
+  .aap-icon.tier-gold { border-color: #e8b339; }
+  .aap-icon.tier-platinum { border-color: #78dcff; }
+  .aap-empty {
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    margin-bottom: 8px;
+  }
+
   /* Glow on account button when signed in */
   .icon-btn.account-active {
     color: var(--accent);
@@ -3367,6 +3421,17 @@
                 <div class="account-email" id="accountEmail2"></div>
               </div>
             </div>
+
+            <!-- Achievements preview — recent unlocks, links out to the full gallery -->
+            <div class="account-achievements-preview" id="accountAchievementsPreview">
+              <div class="aap-header">
+                <span class="aap-title">achievements</span>
+                <span class="aap-count" id="aapCount"></span>
+              </div>
+              <div class="aap-icons" id="aapIcons"></div>
+              <button class="btn-text" id="aapViewAllBtn">view all achievements →</button>
+            </div>
+
             <!-- Username setup — shown when no username is set yet -->
             <div id="usernameSetup" style="display:none;margin-top:8px;">
               <p class="sync-copy" style="margin-bottom:6px;">Choose a display name for the leaderboard:</p>
@@ -7373,6 +7438,7 @@
       document.getElementById('accountAvatar').textContent = email.charAt(0).toUpperCase();
       document.getElementById('accountSyncStatus').textContent = 'Signed in — stats sync automatically.';
       btn.classList.add('account-active');
+      renderAccountAchievementsPreview();
 
       // Capture the cached value right now
       const cachedName = currentUsername;
@@ -10740,6 +10806,45 @@ Rules:
   // progress bar for anything that has a clean numeric threshold to show
   // progress toward (event-based achievements like "100% accuracy" just
   // show locked/unlocked, since there's no meaningful fraction to display).
+  // Compact preview shown right in the account panel — a handful of the
+  // most recently unlocked achievements plus a count, so there's actually
+  // something to see about your progress without opening the full
+  // Performance overlay. Purely a read of existing state; doesn't unlock
+  // or check anything itself.
+  function renderAccountAchievementsPreview() {
+    const iconsEl = document.getElementById('aapIcons');
+    const countEl = document.getElementById('aapCount');
+    if (!iconsEl || !countEl) return;
+
+    const state = loadAchievementState();
+    const unlockedIds = Object.keys(state.unlocked);
+    const total = ACHIEVEMENT_DEFS.length;
+    countEl.textContent = `${unlockedIds.length} / ${total}`;
+
+    if (!unlockedIds.length) {
+      iconsEl.innerHTML = `<div class="aap-empty">complete a test to start earning achievements</div>`;
+      return;
+    }
+
+    const defsById = Object.fromEntries(ACHIEVEMENT_DEFS.map(d => [d.id, d]));
+    const recent = unlockedIds
+      .sort((a, b) => state.unlocked[b] - state.unlocked[a])
+      .slice(0, 6)
+      .map(id => defsById[id])
+      .filter(Boolean);
+
+    iconsEl.innerHTML = recent.map(def => `
+      <div class="aap-icon tier-${def.tier}" title="${escHtml(def.name)} — ${escHtml(def.desc)}">${def.icon}</div>
+    `).join('');
+  }
+
+  document.getElementById('aapViewAllBtn').addEventListener('click', () => {
+    closeAccountPanel();
+    openPerfPage();
+    const achTabBtn = document.querySelector('.perf-tab[data-tab="achievements"]');
+    if (achTabBtn) achTabBtn.click();
+  });
+
   async function renderAchievementsTab() {
     const container = document.getElementById('achievementsContent');
     const state = loadAchievementState();
