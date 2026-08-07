@@ -1124,6 +1124,23 @@
   }
   .duel-notif-text b { color: var(--ink); }
 
+  .duel-request-card { border-color: var(--accent); }
+  .duel-request-accept-btn {
+    appearance: none;
+    border: none;
+    background: var(--accent);
+    color: var(--bg);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 7px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: opacity 0.15s ease;
+  }
+  .duel-request-accept-btn:hover { opacity: 0.85; }
+
   .capslock-warning {
     display: none;
     align-items: center;
@@ -1849,15 +1866,17 @@
     line-height: 1.6;
   }
   .duel-record-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
     padding: 12px 14px;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 10px;
     margin-bottom: 8px;
+  }
+  .duel-record-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
   .duel-record-name {
     font-family: var(--font-ui);
@@ -1874,6 +1893,51 @@
   .duel-record-score .wins { color: var(--good); font-weight: 700; }
   .duel-record-score .losses { color: var(--error); font-weight: 700; }
   .duel-record-score .ties { color: var(--ink-faint); }
+  .duel-again-btn {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--ink-dim);
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+    flex-shrink: 0;
+  }
+  .duel-again-btn:hover { color: var(--accent); border-color: var(--accent-dim); }
+  .duel-mode-picker {
+    display: none;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .duel-mode-picker.show { display: flex; }
+  .duel-mode-picker .dmp-label {
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    margin-right: 2px;
+  }
+  .duel-mode-picker button {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--ink-dim);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 11px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+  .duel-mode-picker button:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
 
   .lb-row {
     display: flex;
@@ -3394,6 +3458,9 @@
       <!-- Shown only when this result completed a challenge someone sent you -->
       <div class="challenge-result" id="challengeResult" style="display:none"></div>
 
+      <!-- Shown only when this result was taken to send a direct duel request -->
+      <div class="challenge-result" id="duelRequestSent" style="display:none"></div>
+
       <!-- First-session progress bar — only visible to new users in first session -->
       <div class="session-progress" id="sessionProgress" style="display:none">
         <div class="sp-step sp-current" data-label="baseline">baseline</div>
@@ -4758,6 +4825,33 @@
       }
     }
 
+    // If this test was started specifically to send a direct duel request
+    // (via "duel again" in the duels tab), upload it now that there's an
+    // actual score/word-list to attach — same principle as the link-based
+    // flow, just delivered as a notification instead of a shareable URL.
+    const duelSentEl = document.getElementById('duelRequestSent');
+    if (duelSentEl) {
+      if (pendingOutgoingDuelRequest && pendingOutgoingDuelRequest.mode === state.mode && pendingOutgoingDuelRequest.val === state.val) {
+        const req = pendingOutgoingDuelRequest;
+        pendingOutgoingDuelRequest = null; // clear immediately — one attempt per click
+        uploadChallenge({
+          mode: state.mode, val: state.val, wpm,
+          acc: accClamped,
+          name: currentUsername || 'a keypace user',
+          words: state.words.slice(0, 200),
+          creatorUserId: authSession ? authSession.user.id : null,
+        }, req.targetUserId).then(() => {
+          duelSentEl.style.display = '';
+          duelSentEl.innerHTML = `Duel request sent to <b>${escHtml(req.targetName)}</b> — beat <b>${wpm} wpm</b>.`;
+        }).catch(() => {
+          duelSentEl.style.display = '';
+          duelSentEl.innerHTML = `Couldn't send the duel request to <b>${escHtml(req.targetName)}</b> — try again from the duels tab.`;
+        });
+      } else {
+        duelSentEl.style.display = 'none';
+      }
+    }
+
     stage.style.display = 'none';
     restartRow.classList.add('hide');
     result.classList.add('show');
@@ -5906,7 +6000,12 @@
     return code;
   }
 
-  async function uploadChallenge(payload) {
+  // targetUserId, when provided, makes this a direct in-app duel request
+  // (no link needs to be sent — the target sees it as a notification the
+  // next time they're signed in) rather than the original link-based flow.
+  // Stored as a real column, not buried in the JSON payload, so it can
+  // actually be queried ("give me all challenges targeting me").
+  async function uploadChallenge(payload, targetUserId) {
     const data = JSON.stringify(payload);
     for (let attempt = 0; attempt < 5; attempt++) {
       const code = generateChallengeCode();
@@ -5918,7 +6017,7 @@
           'Authorization': `Bearer ${SUPABASE_KEY}`,
           'Prefer': 'return=minimal',
         },
-        body: JSON.stringify({ code, data }),
+        body: JSON.stringify({ code, data, target_user_id: targetUserId || null }),
       });
       if (res.ok) return code;
       if (res.status !== 409) {
@@ -6051,6 +6150,59 @@
       else rec.losses++;
     });
     return records;
+  }
+
+  // ---------------- direct duel requests (no link needed) ----------------
+  // Resolves a username to a user_id so a duel request can be aimed at a
+  // specific person. Returns null if the username doesn't exist (e.g. they
+  // deleted their account since you last dueled them) — callers should
+  // show that as a plain "couldn't find them" message, not a crash.
+  async function lookupUserIdByUsername(name) {
+    try {
+      const res = await fetch(
+        `${PROFILES_URL}?username=eq.${encodeURIComponent(name)}&select=user_id`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+      );
+      if (!res.ok) return null;
+      const rows = await res.json();
+      return rows.length ? rows[0].user_id : null;
+    } catch { return null; }
+  }
+
+  // Declining/dismissing an incoming request has to actually stick, or it'd
+  // just reappear on every sync — same local-flag pattern as completed
+  // challenges, just a separate key since "dismissed" and "completed" are
+  // different states.
+  const DISMISSED_DUEL_REQUESTS_KEY = 'keypace_dismissed_duel_requests_v1';
+  function loadDismissedDuelRequests() {
+    try { return new Set(JSON.parse(localStorage.getItem(DISMISSED_DUEL_REQUESTS_KEY)) || []); }
+    catch { return new Set(); }
+  }
+  function dismissDuelRequestLocal(code) {
+    const set = loadDismissedDuelRequests();
+    set.add(code);
+    try { localStorage.setItem(DISMISSED_DUEL_REQUESTS_KEY, JSON.stringify([...set])); } catch {}
+  }
+
+  // Set right before jumping into a freshly-started test aimed at a
+  // specific opponent (see the "duel again" button in the duels tab).
+  // Checked in the results-completion flow: once a test finishes matching
+  // this mode/val, THAT test's score and word list become the duel request
+  // uploaded to the target — same "your exact test becomes the challenge"
+  // principle as the link-based flow, just without a link.
+  let pendingOutgoingDuelRequest = null;
+
+  async function sendDuelRequest(targetName, mode, val) {
+    const targetUserId = await lookupUserIdByUsername(targetName);
+    if (!targetUserId) {
+      alert(`Couldn't find ${targetName} — they may have deleted their account.`);
+      return;
+    }
+    pendingOutgoingDuelRequest = { targetUserId, targetName, mode, val };
+    const targetBtn = modesNav.querySelector(`button[data-mode="${mode}"][data-val="${val}"]`);
+    if (targetBtn) targetBtn.click();
+    closePerfPage();
+    focusInput();
   }
 
   // Checks the URL for an incoming challenge code and, if present, fetches
@@ -6592,6 +6744,7 @@
       await syncExistingBestsToLeaderboard();
       await syncStreakFromServer();
       await checkAndShowDuelNotifications();
+      await checkIncomingDuelRequests();
       status.textContent = 'Signed in — stats sync automatically.';
       status.className = 'sync-result show success';
     } catch (e) {
@@ -6654,6 +6807,7 @@
       await pushStats();
       await syncStreakFromServer();
       await checkAndShowDuelNotifications();
+      await checkIncomingDuelRequests();
       status.textContent = 'All synced!';
       status.className = 'sync-result show success';
     } catch (e) {
@@ -6751,6 +6905,85 @@
     });
   }
 
+  // Checks for direct duel requests aimed at the signed-in user (challenges
+  // with target_user_id = me) and shows them as notification cards with an
+  // Accept/Dismiss choice — this is the actual "no link needed" delivery
+  // mechanism for requests sent via the duels tab's "duel again" button.
+  // Filters out anything already completed (isChallengeAlreadyCompleted)
+  // or previously dismissed (loadDismissedDuelRequests), so this doesn't
+  // nag about the same request forever.
+  async function checkIncomingDuelRequests() {
+    if (!authSession) return;
+    try {
+      const res = await authFetch(
+        `${CHALLENGES_TABLE_ENDPOINT}?target_user_id=eq.${authSession.user.id}&select=code,data,created_at&order=created_at.desc&limit=20`,
+        {}, true
+      );
+      if (!res.ok) return;
+      const rows = await res.json();
+      if (!rows.length) return;
+
+      const dismissed = loadDismissedDuelRequests();
+      let container = document.getElementById('duelRequestNotifications');
+      if (!container) {
+        container = document.createElement('div');
+        container.className = 'duel-notifications';
+        container.id = 'duelRequestNotifications';
+        document.body.appendChild(container);
+      }
+
+      for (const row of rows) {
+        if (dismissed.has(row.code)) continue;
+        if (await isChallengeAlreadyCompleted(row.code)) continue;
+
+        let payload;
+        try { payload = JSON.parse(row.data); } catch { continue; }
+        if (!payload || (payload.mode !== 'time' && payload.mode !== 'words') || !(payload.val > 0) || !(payload.wpm > 0)) continue;
+
+        const modeLabel = payload.mode === 'time' ? `${payload.val}s` : `${payload.val}w`;
+        const card = document.createElement('div');
+        card.className = 'duel-notif-card duel-request-card';
+        card.innerHTML = `
+          <button class="duel-notif-close" title="Dismiss">×</button>
+          <div class="duel-notif-text"><b>${escHtml(payload.name || 'someone')}</b> wants to duel you on the ${modeLabel} test — beat <b>${payload.wpm} wpm</b>.</div>
+          <button class="duel-request-accept-btn">accept →</button>
+        `;
+        card.querySelector('.duel-notif-close').addEventListener('click', () => {
+          dismissDuelRequestLocal(row.code);
+          card.remove();
+        });
+        card.querySelector('.duel-request-accept-btn').addEventListener('click', () => {
+          acceptDuelRequest(row.code, payload);
+          card.remove();
+        });
+        container.appendChild(card);
+      }
+    } catch (err) {
+      console.warn('Could not check duel requests:', err.message);
+    }
+  }
+
+  // Skips the banner step entirely — clicking "accept" on the notification
+  // card itself is already the explicit confirmation, so this jumps
+  // straight into the test the same way activateChallengeBanner()'s accept
+  // handler does.
+  function acceptDuelRequest(code, payload) {
+    pendingChallenge = {
+      code,
+      mode: payload.mode,
+      val: payload.val,
+      wpm: payload.wpm,
+      acc: (typeof payload.acc === 'number') ? payload.acc : null,
+      name: (payload.name || 'someone').slice(0, 24),
+      creatorUserId: payload.creatorUserId || null,
+      words: (Array.isArray(payload.words) && payload.words.length) ? payload.words : null,
+      completed: false,
+    };
+    const targetBtn = modesNav.querySelector(`button[data-mode="${payload.mode}"][data-val="${payload.val}"]`);
+    if (targetBtn) targetBtn.click();
+    focusInput();
+  }
+
   // Auto-sync on page load if already signed in
   if (authSession) {
     pullStats().then(async () => {
@@ -6758,6 +6991,7 @@
       await syncExistingBestsToLeaderboard();
       await syncStreakFromServer();
       await checkAndShowDuelNotifications();
+      await checkIncomingDuelRequests();
     }).catch(() => {});
   }
 
@@ -10001,16 +10235,45 @@ Rules:
     const records = aggregateDuelRecords(rows, currentUsername);
     const sorted = [...records.entries()].sort((a, b) => new Date(b[1].lastPlayed) - new Date(a[1].lastPlayed));
     container.innerHTML = sorted.map(([name, rec]) => `
-      <div class="duel-record-row">
-        <div class="duel-record-name">${escHtml(name)}</div>
-        <div class="duel-record-score">
-          <span class="wins">${rec.wins}W</span>
-          <span class="losses">${rec.losses}L</span>
-          ${rec.ties ? `<span class="ties">${rec.ties}T</span>` : ''}
+      <div class="duel-record-row" data-opponent="${escHtml(name)}">
+        <div class="duel-record-top">
+          <div class="duel-record-name">${escHtml(name)}</div>
+          <div class="duel-record-score">
+            <span class="wins">${rec.wins}W</span>
+            <span class="losses">${rec.losses}L</span>
+            ${rec.ties ? `<span class="ties">${rec.ties}T</span>` : ''}
+          </div>
+          <button class="duel-again-btn">duel again</button>
+        </div>
+        <div class="duel-mode-picker">
+          <span class="dmp-label">pick a mode to duel on:</span>
+          <button data-mode="time" data-val="15">15s</button>
+          <button data-mode="time" data-val="30">30s</button>
+          <button data-mode="time" data-val="60">60s</button>
+          <button data-mode="words" data-val="25">25w</button>
+          <button data-mode="words" data-val="50">50w</button>
         </div>
       </div>
     `).join('');
   }
+
+  // Delegated once on the static container, not per-render — renderDuelsTab()
+  // can run every time the tab is opened, and attaching a fresh listener
+  // each time would stack duplicates.
+  document.getElementById('duelsContent').addEventListener('click', (e) => {
+    const modeBtn = e.target.closest('.duel-mode-picker button');
+    if (modeBtn) {
+      const row = modeBtn.closest('.duel-record-row');
+      sendDuelRequest(row.dataset.opponent, modeBtn.dataset.mode, parseInt(modeBtn.dataset.val, 10));
+      return;
+    }
+    const againBtn = e.target.closest('.duel-again-btn');
+    if (againBtn) {
+      const picker = againBtn.closest('.duel-record-row').querySelector('.duel-mode-picker');
+      document.querySelectorAll('.duel-mode-picker.show').forEach(p => { if (p !== picker) p.classList.remove('show'); });
+      picker.classList.toggle('show');
+    }
+  });
 
   // Tab switching
   document.querySelectorAll('.perf-tab').forEach(btn => {
