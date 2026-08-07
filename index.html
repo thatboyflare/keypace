@@ -1149,6 +1149,72 @@
   }
   .duel-request-accept-btn:hover { opacity: 0.85; }
 
+  /* ---------- achievement toasts ---------- */
+  .achievement-toasts {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    pointer-events: none;
+  }
+  .achievement-toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 20px 14px 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    animation: achievementIn 0.4s cubic-bezier(0.16,1,0.3,1);
+    min-width: 260px;
+    pointer-events: auto;
+  }
+  .achievement-toast.leaving { animation: achievementOut 0.3s ease forwards; }
+  @keyframes achievementIn {
+    from { opacity: 0; transform: translateY(-20px) scale(0.9); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes achievementOut {
+    to { opacity: 0; transform: translateY(-10px) scale(0.95); }
+  }
+  .at-icon {
+    font-size: 26px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  /* Tier colors are fixed (not theme-driven) on purpose — a gold border
+     should read as "gold" the same way regardless of which of the 14
+     themes is active, same as any game's rarity system. */
+  .achievement-toast.tier-bronze { border-color: #cd7f32; }
+  .achievement-toast.tier-bronze .at-icon { background: rgba(205,127,50,0.15); }
+  .achievement-toast.tier-silver { border-color: #c0c0c0; }
+  .achievement-toast.tier-silver .at-icon { background: rgba(192,192,192,0.15); }
+  .achievement-toast.tier-gold { border-color: #e8b339; }
+  .achievement-toast.tier-gold .at-icon { background: rgba(232,179,57,0.18); }
+  .achievement-toast.tier-platinum { border-color: #78dcff; }
+  .achievement-toast.tier-platinum .at-icon { background: rgba(120,220,255,0.18); }
+  .at-label {
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .at-name { font-family: var(--font-ui); font-size: 15px; font-weight: 700; color: var(--ink); margin-top: 1px; }
+  .at-desc { font-family: var(--font-ui); font-size: 12px; color: var(--ink-dim); margin-top: 1px; }
+
   .capslock-warning {
     display: none;
     align-items: center;
@@ -1946,6 +2012,59 @@
     transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
   }
   .duel-mode-picker button:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+
+  /* ---------- achievements gallery ---------- */
+  .achievements-header {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-dim);
+    margin-bottom: 14px;
+  }
+  .achievements-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 10px;
+  }
+  .achievement-card {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .achievement-card.locked { opacity: 0.5; }
+  .achievement-card.locked .ac-icon { filter: grayscale(1); }
+  .achievement-card.tier-bronze.unlocked { border-color: #cd7f32; }
+  .achievement-card.tier-silver.unlocked { border-color: #c0c0c0; }
+  .achievement-card.tier-gold.unlocked { border-color: #e8b339; }
+  .achievement-card.tier-platinum.unlocked { border-color: #78dcff; }
+  .ac-icon {
+    font-size: 24px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+  .ac-name { font-family: var(--font-ui); font-size: 13.5px; font-weight: 700; color: var(--ink); }
+  .ac-desc { font-family: var(--font-ui); font-size: 12px; color: var(--ink-dim); margin-top: 2px; }
+  .ac-date { font-family: var(--font-ui); font-size: 11px; color: var(--ink-faint); margin-top: 6px; }
+  .ac-progress-bar {
+    width: 100%;
+    height: 5px;
+    background: var(--bg);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .ac-progress-fill { height: 100%; background: var(--accent); border-radius: 3px; }
+  .ac-progress-label { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); margin-top: 4px; }
 
   .lb-row {
     display: flex;
@@ -3550,6 +3669,7 @@
       <button class="perf-tab active" data-tab="stats">my stats</button>
       <button class="perf-tab" data-tab="leaderboard">leaderboard</button>
       <button class="perf-tab" data-tab="duels">duels</button>
+      <button class="perf-tab" data-tab="achievements">achievements</button>
     </div>
 
     <!-- My stats tab -->
@@ -3636,6 +3756,11 @@
     <!-- Duels tab — head-to-head records against people you've challenged -->
     <div class="perf-tab-panel" id="perfTabDuels" style="display:none">
       <div id="duelsContent"></div>
+    </div>
+
+    <!-- Achievements tab — the full gallery, locked and unlocked -->
+    <div class="perf-tab-panel" id="perfTabAchievements" style="display:none">
+      <div id="achievementsContent"></div>
     </div>
   </div>
 
@@ -4791,6 +4916,17 @@
     // "beat this score" comparison.
     lastResultData = { wpm, acc: accClamped, raw, mode: state.mode, val: state.val, date: Date.now(), words: state.words.slice() };
 
+    // Achievements checked against this specific test's details, plus
+    // whatever cumulative state (bests/totalTests/streak) is already
+    // current at this point in the flow.
+    checkAchievements({
+      ...buildTestAchievementContext(),
+      testAcc: accClamped,
+      testHour: new Date().getHours(),
+      testWasCode: settings.code,
+      testWasPunct: settings.punctuation,
+    });
+
     // Only time/words results have a fixed target worth challenging someone
     // to beat — daily/zen don't map cleanly onto a "beat this score" link.
     const challengeBtnEl = document.getElementById('challengeBtn');
@@ -4827,10 +4963,15 @@
         }
 
         // Record before clearing pendingChallenge — needs its code/name/
-        // creatorUserId. Fire-and-forget: the local completion flag below
-        // is what actually blocks a retake even if this network call is
-        // slow or fails; the server record is what additionally enables
-        // cross-device blocking, creator notification, and duel history.
+        // creatorUserId. The achievement check is chained onto this
+        // (not fired independently) because it queries the same table this
+        // just wrote to — firing it in parallel instead of after risked the
+        // read happening before the write actually landed, undercounting
+        // the duel that just finished. Still fully non-blocking overall:
+        // neither this insert nor the chained check is awaited, so the
+        // results screen renders immediately regardless of network speed.
+        // The local completion flag below is what actually blocks a
+        // retake even if this whole chain is slow or fails.
         recordDuelResult({
           challenge_code: pendingChallenge.code,
           creator_user_id: pendingChallenge.creatorUserId,
@@ -4843,6 +4984,8 @@
           acceptor_wpm: wpm,
           acceptor_acc: accClamped,
           outcome,
+        }).then((ok) => {
+          if (ok) checkDuelAchievements(won ? (wpm - pendingChallenge.wpm) : null).catch(() => {});
         }).catch(() => {});
         markChallengeCompletedLocal(pendingChallenge.code);
 
@@ -5107,6 +5250,7 @@
     const testsThisMonth = source.filter(h => now - h.date <= 30 * DAY).length;
 
     const shareBtn = document.getElementById('shareProgressBtn');
+    let allRecentWpm = null, allBaseWpm = null;
     if (shareBtn) {
       // The share card always tells an overall progress story (not
       // mode-specific), so its availability shouldn't depend on whatever
@@ -5115,8 +5259,13 @@
       const allRecent = history.filter(h => now - h.date <= 7 * DAY);
       const allRecentSample = allRecent.length ? allRecent : history.slice(0, 5);
       const allBaseline = history.filter(h => now - h.date >= 23 * DAY && now - h.date <= 37 * DAY);
-      const shareAvailable = avg(allRecentSample, 'wpm') != null && avg(allBaseline, 'wpm') != null;
+      allRecentWpm = avg(allRecentSample, 'wpm');
+      allBaseWpm = avg(allBaseline, 'wpm');
+      const shareAvailable = allRecentWpm != null && allBaseWpm != null;
       shareBtn.style.display = shareAvailable ? '' : 'none';
+    }
+    if (allRecentWpm != null && allBaseWpm != null) {
+      checkAchievements({ monthDeltaWpm: allRecentWpm - allBaseWpm });
     }
 
     function deltaCard(label, current, base, unit) {
@@ -5833,6 +5982,16 @@
       if (result.classList.contains('show')) drawChart();
       if (perfOverlay.classList.contains('show')) renderPerfChart();
     }
+
+    // Style Icon achievement — dedupes automatically, so this is safe to
+    // run on every call including the one on initial page load that just
+    // re-applies whatever theme was already saved.
+    const achState = loadAchievementState();
+    if (!achState.themesTried.includes(id)) {
+      achState.themesTried.push(id);
+      saveAchievementState(achState);
+      checkAchievements({ themesTriedCount: achState.themesTried.length });
+    }
   }
 
   function renderThemeGrid() {
@@ -6177,6 +6336,43 @@
       else rec.losses++;
     });
     return records;
+  }
+
+  // Total wins and current win streak, computed fresh from duel_results —
+  // the same rows fetchDuelHistory() already pulls, sorted newest-first.
+  // This replaced a per-device local counter: that counter could never
+  // have been accurate across devices anyway (each device only knew about
+  // duels IT completed), so computing live from the server is strictly
+  // more correct, not just "now synced." A tie neither adds to the streak
+  // nor breaks it, matching the same rule used when these were local
+  // counters; only an outright loss ends the current streak.
+  function computeDuelStatsFromHistory(rows, myName) {
+    let wins = 0;
+    let winStreak = 0;
+    let streakActive = true; // becomes false once a loss is hit, walking newest -> oldest
+    rows.forEach(r => {
+      const iAmCreator = r.creator_name === myName;
+      const won  = (iAmCreator && r.outcome === 'creator_win')  || (!iAmCreator && r.outcome === 'acceptor_win');
+      const lost = (iAmCreator && r.outcome === 'acceptor_win') || (!iAmCreator && r.outcome === 'creator_win');
+      if (won) {
+        wins++;
+        if (streakActive) winStreak++;
+      } else if (lost) {
+        streakActive = false;
+      }
+    });
+    return { wins, winStreak };
+  }
+
+  // Called right after a duel completes — fetches the authoritative duel
+  // history and checks duel-related achievements against it, rather than
+  // trusting client-side state that could drift from what the server
+  // actually recorded.
+  async function checkDuelAchievements(latestMargin) {
+    const rows = await fetchDuelHistory();
+    if (!rows.length) return;
+    const { wins, winStreak } = computeDuelStatsFromHistory(rows, currentUsername);
+    checkAchievements({ duelWins: wins, duelWinStreak: winStreak, duelMargin: latestMargin });
   }
 
   // ---------------- direct duel requests (no link needed) ----------------
@@ -6685,6 +6881,7 @@
       user_id: authSession.user.id,
       bests: bests,
       history: history.slice(0, 200),
+      achievements: loadAchievementState(),
       updated_at: new Date().toISOString(),
     };
     const res = await authFetch(STATS_URL, {
@@ -6701,7 +6898,7 @@
   async function pullStats() {
     if (!authSession) return false;
     const res = await authFetch(
-      `${STATS_URL}?user_id=eq.${authSession.user.id}&select=bests,history`,
+      `${STATS_URL}?user_id=eq.${authSession.user.id}&select=bests,history,achievements`,
       {}, true // suppressClear
     );
     if (!res.ok) throw new Error(`Pull failed (${res.status})`);
@@ -6725,6 +6922,28 @@
       renderHistory();
       refreshBestBadge();
     }
+
+    // Achievement merge: unlocks are permanent records, so this is a union,
+    // not a last-write-wins overwrite — an achievement earned on one
+    // device before it ever synced must never be "lost" by pulling a
+    // cloud copy that doesn't have it yet. Where BOTH sides already have
+    // the same achievement, keep the earlier timestamp — that's the more
+    // truthful record of when it was actually first earned, and pushStats()
+    // will carry that reconciled state back up right after this runs.
+    if (remote.achievements && typeof remote.achievements === 'object') {
+      const local = loadAchievementState();
+      let achChanged = false;
+
+      Object.entries(remote.achievements.unlocked || {}).forEach(([id, ts]) => {
+        if (!local.unlocked[id] || ts < local.unlocked[id]) { local.unlocked[id] = ts; achChanged = true; }
+      });
+      (remote.achievements.themesTried || []).forEach(id => {
+        if (!local.themesTried.includes(id)) { local.themesTried.push(id); achChanged = true; }
+      });
+
+      if (achChanged) saveAchievementState(local);
+    }
+
     return true;
   }
 
@@ -7477,6 +7696,8 @@ COACHING GUIDELINES:
     coachStreaming = true;
     coachSendBtn.disabled = true;
     coachInput.value = '';
+
+    checkAchievements({ usedCoachChat: true });
 
     // Clear empty state on first message
     const emptyEl = coachMessages.querySelector('.coach-empty');
@@ -9601,6 +9822,148 @@ COACHING GUIDELINES:
   }
 
   // ================================================================
+  // ACHIEVEMENTS
+  // Deliberately local-only for v1 (like the weakness profile) — doesn't
+  // sync across devices for signed-in users yet. Stated plainly rather
+  // than silently shipping something that looks synced but isn't; a real
+  // next step would be adding this as a column on user_stats alongside
+  // bests/history.
+  //
+  // Design principle: unlocks are checked against CURRENT CUMULATIVE state
+  // (bests, a persistent test counter, streak, local duel counters) — never
+  // by re-scanning the full history array, which is capped at 500 entries
+  // and would silently "forget" an early achievement once old entries age
+  // out. Once unlocked, an achievement is a permanent record; it's checked
+  // for NEW unlocks at meaningful moments (test completion, duel
+  // completion, theme change, etc.), not recomputed from scratch each time.
+  // ================================================================
+  const ACHIEVEMENTS_KEY = 'keypace_achievements_v1';
+
+  function loadAchievementState() {
+    try {
+      return Object.assign({
+        unlocked: {},        // id -> unix ms timestamp when earned
+        themesTried: [],     // theme ids applied at least once
+      }, JSON.parse(localStorage.getItem(ACHIEVEMENTS_KEY)) || {});
+    } catch {
+      return { unlocked: {}, themesTried: [] };
+    }
+  }
+  function saveAchievementState(s) {
+    try { localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(s)); } catch {}
+  }
+
+  // check(ctx) reads whatever fields the calling trigger point populated on
+  // ctx — a field simply being undefined means that particular achievement
+  // can't unlock from THIS trigger, which is fine, since it'll be checked
+  // again the next time a trigger provides the field it needs.
+  const ACHIEVEMENT_DEFS = [
+    // ---- speed (from bests — always reflects current PBs, not a decaying history scan) ----
+    { id: 'speed_50',  tier: 'bronze',   icon: '⚡', name: 'Getting Quick',  desc: 'Reach 50 WPM',  check: ctx => ctx.maxWpm >= 50 },
+    { id: 'speed_75',  tier: 'silver',   icon: '⚡', name: 'Speed Demon',    desc: 'Reach 75 WPM',  check: ctx => ctx.maxWpm >= 75 },
+    { id: 'speed_100', tier: 'gold',     icon: '🚀', name: 'Triple Digits',  desc: 'Reach 100 WPM', check: ctx => ctx.maxWpm >= 100 },
+    { id: 'speed_125', tier: 'gold',     icon: '🔥', name: 'Blazing',        desc: 'Reach 125 WPM', check: ctx => ctx.maxWpm >= 125 },
+    { id: 'speed_150', tier: 'platinum', icon: '👑', name: 'Untouchable',    desc: 'Reach 150 WPM', check: ctx => ctx.maxWpm >= 150 },
+
+    // ---- volume (from the persistent weakness-profile test counter, never truncated) ----
+    { id: 'tests_10',  tier: 'bronze',   icon: '📈', name: 'Warming Up',  desc: 'Complete 10 tests',  check: ctx => ctx.totalTests >= 10 },
+    { id: 'tests_50',  tier: 'silver',   icon: '📈', name: 'Dedicated',   desc: 'Complete 50 tests',  check: ctx => ctx.totalTests >= 50 },
+    { id: 'tests_100', tier: 'gold',     icon: '🏛️', name: 'Centurion',   desc: 'Complete 100 tests', check: ctx => ctx.totalTests >= 100 },
+    { id: 'tests_500', tier: 'platinum', icon: '🎖️', name: 'Veteran',     desc: 'Complete 500 tests', check: ctx => ctx.totalTests >= 500 },
+
+    // ---- streak ----
+    { id: 'streak_7',   tier: 'silver',   icon: '🔥', name: 'Week Warrior',    desc: '7 day streak',   check: ctx => ctx.streak >= 7 },
+    { id: 'streak_30',  tier: 'gold',     icon: '🔥', name: 'Monthly Master',  desc: '30 day streak',  check: ctx => ctx.streak >= 30 },
+    { id: 'streak_100', tier: 'platinum', icon: '🔥', name: 'Unstoppable',     desc: '100 day streak', check: ctx => ctx.streak >= 100 },
+
+    // ---- event-based, checked right at the moment a qualifying test finishes ----
+    { id: 'perfect_acc',  tier: 'silver', icon: '💯', name: 'Flawless',     desc: 'Complete a test with 100% accuracy', check: ctx => ctx.testAcc === 100 },
+    { id: 'night_owl',    tier: 'bronze', icon: '🦉', name: 'Night Owl',    desc: 'Complete a test between midnight and 4am', check: ctx => ctx.testHour != null && ctx.testHour >= 0 && ctx.testHour < 4 },
+    { id: 'code_mode',    tier: 'bronze', icon: '💻', name: 'Code Warrior', desc: 'Complete a code-mode test', check: ctx => ctx.testWasCode === true },
+    { id: 'punct_master', tier: 'bronze', icon: '❗', name: 'Punctuator',   desc: 'Complete a punctuation test with 95%+ accuracy', check: ctx => ctx.testWasPunct === true && ctx.testAcc >= 95 },
+
+    // ---- duels (local counters, incremented right when a duel result is recorded) ----
+    { id: 'duel_first_win', tier: 'bronze', icon: '⚔️', name: 'First Blood', desc: 'Win your first duel', check: ctx => ctx.duelWins >= 1 },
+    { id: 'duel_5_wins',    tier: 'silver', icon: '⚔️', name: 'Dueler',      desc: 'Win 5 duels', check: ctx => ctx.duelWins >= 5 },
+    { id: 'duel_25_wins',   tier: 'gold',   icon: '🗡️', name: 'Gladiator',   desc: 'Win 25 duels', check: ctx => ctx.duelWins >= 25 },
+    { id: 'duel_streak_3',  tier: 'silver', icon: '⚔️', name: 'On a Roll',   desc: 'Win 3 duels in a row', check: ctx => ctx.duelWinStreak >= 3 },
+    { id: 'duel_blowout',   tier: 'bronze', icon: '💥', name: 'Blowout',     desc: 'Win a duel by 20+ WPM', check: ctx => ctx.duelMargin != null && ctx.duelMargin >= 20 },
+
+    // ---- progress ----
+    { id: 'rising_star', tier: 'silver', icon: '📊', name: 'Rising Star', desc: 'Improve 20+ WPM vs a month ago', check: ctx => ctx.monthDeltaWpm != null && ctx.monthDeltaWpm >= 20 },
+
+    // ---- exploration ----
+    { id: 'theme_explorer', tier: 'bronze', icon: '🎨', name: 'Style Icon',  desc: 'Try 5 different themes', check: ctx => ctx.themesTriedCount >= 5 },
+    { id: 'coach_chat',     tier: 'bronze', icon: '🎓', name: 'Ask the Coach', desc: 'Send a message to the AI coach', check: ctx => ctx.usedCoachChat === true },
+    { id: 'drill_complete', tier: 'bronze', icon: '🎯', name: 'Dialed In',   desc: 'Complete a coach-tailored drill', check: ctx => ctx.completedDrill === true },
+  ];
+
+  // Evaluates every not-yet-unlocked achievement against whatever fields
+  // are present on ctx, unlocking (and toasting) any that now pass. Safe to
+  // call often and with a partial context — fields the current trigger
+  // didn't populate are just undefined, and their checks simply won't pass
+  // yet (not an error).
+  function checkAchievements(ctx) {
+    const state = loadAchievementState();
+    let changed = false;
+    ACHIEVEMENT_DEFS.forEach(def => {
+      if (state.unlocked[def.id]) return; // already earned, permanent
+      let passed = false;
+      try { passed = !!def.check(ctx); } catch { passed = false; }
+      if (passed) {
+        state.unlocked[def.id] = Date.now();
+        changed = true;
+        showAchievementToast(def);
+      }
+    });
+    if (changed) saveAchievementState(state);
+  }
+
+  function showAchievementToast(def) {
+    let container = document.getElementById('achievementToasts');
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'achievement-toasts';
+      container.id = 'achievementToasts';
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = `achievement-toast tier-${def.tier}`;
+    toast.innerHTML = `
+      <div class="at-icon">${def.icon}</div>
+      <div class="at-body">
+        <div class="at-label">achievement unlocked</div>
+        <div class="at-name">${escHtml(def.name)}</div>
+        <div class="at-desc">${escHtml(def.desc)}</div>
+      </div>
+    `;
+    container.appendChild(toast);
+    // Auto-dismiss — this is a celebratory moment, not something needing a
+    // decision, unlike duel notifications which stay until acted on.
+    setTimeout(() => {
+      toast.classList.add('leaving');
+      setTimeout(() => toast.remove(), 300);
+    }, 4500);
+  }
+
+  // Builds the common fields every test-completion check needs. Kept
+  // separate from duel-specific/exploration-specific context so callers
+  // can spread this in and add just what's new at their trigger point.
+  function buildTestAchievementContext() {
+    const bestsObj = bests || {};
+    const maxWpm = Object.values(bestsObj).reduce((m, b) => Math.max(m, b.wpm || 0), 0);
+    const weaknessStore = (typeof loadWeaknessStore === 'function') ? loadWeaknessStore() : { buckets: {} };
+    const totalTests = (typeof mergeAllBuckets === 'function') ? mergeAllBuckets(weaknessStore).testCount : history.length;
+    const achState = loadAchievementState();
+    return {
+      maxWpm,
+      totalTests,
+      streak: (typeof loadStreak === 'function') ? (loadStreak().count || 0) : 0,
+      themesTriedCount: achState.themesTried.length,
+    };
+  }
+
+  // ================================================================
   // STRUCTURED COACH REQUEST
   // Sends deterministic diagnostics to Claude, gets back a validated
   // JSON response. Falls back to a deterministic response if anything
@@ -9912,6 +10275,8 @@ Rules:
   }
 
   function showDrillResults(drillWpm, drillAcc) {
+    checkAchievements({ completedDrill: true });
+
     const snap       = predrillSnapshot;
     const elapsedMs  = state.endTime - state.startTime;
     const elapsedSec = Math.max(1, elapsedMs / 1000);
@@ -10370,6 +10735,88 @@ Rules:
     }
   });
 
+  // Renders the full achievement gallery — unlocked ones first (grouped
+  // implicitly by sort, not headers), then locked ones by tier, with a
+  // progress bar for anything that has a clean numeric threshold to show
+  // progress toward (event-based achievements like "100% accuracy" just
+  // show locked/unlocked, since there's no meaningful fraction to display).
+  async function renderAchievementsTab() {
+    const container = document.getElementById('achievementsContent');
+    const state = loadAchievementState();
+    const ctx = buildTestAchievementContext();
+    // Duel progress needs a live fetch (see below) — start at 0 so the bars
+    // don't briefly show stale or wrong progress, then get corrected once
+    // the fetch resolves. This function only ever READS unlock state; it
+    // never calls checkAchievements() itself, so simply viewing this tab
+    // can't accidentally unlock anything.
+    ctx.duelWins = 0;
+    ctx.duelWinStreak = 0;
+
+    const unlockedCount = Object.keys(state.unlocked).length;
+    const totalCount = ACHIEVEMENT_DEFS.length;
+
+    function progressFor(def) {
+      const m = def.id.match(/_(\d+)(?:_|$)/);
+      switch (def.id) {
+        case 'speed_50': case 'speed_75': case 'speed_100': case 'speed_125': case 'speed_150':
+          return { current: Math.min(ctx.maxWpm, +m[1]), target: +m[1] };
+        case 'tests_10': case 'tests_50': case 'tests_100': case 'tests_500':
+          return { current: Math.min(ctx.totalTests, +m[1]), target: +m[1] };
+        case 'streak_7': case 'streak_30': case 'streak_100':
+          return { current: Math.min(ctx.streak, +m[1]), target: +m[1] };
+        case 'duel_5_wins': return { current: Math.min(ctx.duelWins, 5), target: 5 };
+        case 'duel_25_wins': return { current: Math.min(ctx.duelWins, 25), target: 25 };
+        case 'duel_streak_3': return { current: Math.min(ctx.duelWinStreak, 3), target: 3 };
+        case 'theme_explorer': return { current: Math.min(ctx.themesTriedCount, 5), target: 5 };
+        default: return null;
+      }
+    }
+
+    function draw() {
+      const tierOrder = { bronze: 0, silver: 1, gold: 2, platinum: 3 };
+      const sorted = [...ACHIEVEMENT_DEFS].sort((a, b) => {
+        const aU = !!state.unlocked[a.id], bU = !!state.unlocked[b.id];
+        if (aU !== bU) return aU ? -1 : 1;
+        if (aU && bU) return state.unlocked[b.id] - state.unlocked[a.id]; // most recently earned first
+        return tierOrder[a.tier] - tierOrder[b.tier];
+      });
+
+      const cards = sorted.map(def => {
+        const unlockedAt = state.unlocked[def.id];
+        const prog = !unlockedAt ? progressFor(def) : null;
+        return `
+          <div class="achievement-card tier-${def.tier} ${unlockedAt ? 'unlocked' : 'locked'}">
+            <div class="ac-icon">${def.icon}</div>
+            <div class="ac-body">
+              <div class="ac-name">${escHtml(def.name)}</div>
+              <div class="ac-desc">${escHtml(def.desc)}</div>
+              ${unlockedAt
+                ? `<div class="ac-date">earned ${new Date(unlockedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</div>`
+                : prog
+                  ? `<div class="ac-progress-bar"><div class="ac-progress-fill" style="width:${Math.min(100, (prog.current / prog.target) * 100)}%"></div></div><div class="ac-progress-label">${prog.current} / ${prog.target}</div>`
+                  : `<div class="ac-progress-label">locked</div>`
+              }
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = `<div class="achievements-header">${unlockedCount} / ${totalCount} unlocked</div><div class="achievements-grid">${cards}</div>`;
+    }
+
+    draw();
+
+    if (currentUsername) {
+      try {
+        const rows = await fetchDuelHistory();
+        const { wins, winStreak } = computeDuelStatsFromHistory(rows, currentUsername);
+        ctx.duelWins = wins;
+        ctx.duelWinStreak = winStreak;
+        draw(); // re-render with accurate duel progress now that it's in
+      } catch { /* leave duel progress at 0 rather than break the tab */ }
+    }
+  }
+
   // Tab switching
   document.querySelectorAll('.perf-tab').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -10379,8 +10826,10 @@ Rules:
       document.getElementById('perfTabStats').style.display        = tab === 'stats'       ? '' : 'none';
       document.getElementById('perfTabLeaderboard').style.display  = tab === 'leaderboard' ? '' : 'none';
       document.getElementById('perfTabDuels').style.display        = tab === 'duels'       ? '' : 'none';
+      document.getElementById('perfTabAchievements').style.display = tab === 'achievements' ? '' : 'none';
       if (tab === 'leaderboard') loadLeaderboardTab(lbCurrentMode);
       if (tab === 'duels') renderDuelsTab();
+      if (tab === 'achievements') renderAchievementsTab();
     });
   });
 
