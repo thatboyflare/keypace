@@ -5050,7 +5050,7 @@
           acceptor_acc: accClamped,
           outcome,
         }).then((ok) => {
-          if (ok) checkDuelAchievements(won ? (wpm - pendingChallenge.wpm) : null).catch(() => {});
+          if (ok) checkDuelAchievements().catch(() => {});
         }).catch(() => {});
         markChallengeCompletedLocal(pendingChallenge.code);
 
@@ -6450,6 +6450,7 @@
     let wins = 0;
     let winStreak = 0;
     let streakActive = true; // becomes false once a loss is hit, walking newest -> oldest
+    let maxMargin = null; // largest margin across any win, for retroactively catching the blowout achievement
     rows.forEach(r => {
       const iAmCreator = amICreator(r, myUserId, myName);
       const won  = (iAmCreator && r.outcome === 'creator_win')  || (!iAmCreator && r.outcome === 'acceptor_win');
@@ -6457,22 +6458,30 @@
       if (won) {
         wins++;
         if (streakActive) winStreak++;
+        const myWpm = iAmCreator ? r.creator_wpm : r.acceptor_wpm;
+        const theirWpm = iAmCreator ? r.acceptor_wpm : r.creator_wpm;
+        const margin = (typeof myWpm === 'number' && typeof theirWpm === 'number') ? myWpm - theirWpm : null;
+        if (margin != null && (maxMargin == null || margin > maxMargin)) maxMargin = margin;
       } else if (lost) {
         streakActive = false;
       }
     });
-    return { wins, winStreak };
+    return { wins, winStreak, maxMargin };
   }
 
-  // Called right after a duel completes — fetches the authoritative duel
-  // history and checks duel-related achievements against it, rather than
-  // trusting client-side state that could drift from what the server
-  // actually recorded.
-  async function checkDuelAchievements(latestMargin) {
+  // Fetches the authoritative duel history and checks duel-related
+  // achievements against it, rather than trusting client-side state that
+  // could drift from what the server actually recorded. Deliberately
+  // callable from multiple places, not just right after a fresh duel
+  // completes — see the other call sites in renderDuelsTab/
+  // renderAchievementsTab/sync points, which let a fix to the underlying
+  // matching logic (or a request that failed to record the first time)
+  // get caught retroactively next time this runs, not just going forward.
+  async function checkDuelAchievements() {
     const rows = await fetchDuelHistory();
     if (!rows.length) return;
-    const { wins, winStreak } = computeDuelStatsFromHistory(rows, currentUsername);
-    checkAchievements({ duelWins: wins, duelWinStreak: winStreak, duelMargin: latestMargin });
+    const { wins, winStreak, maxMargin } = computeDuelStatsFromHistory(rows, currentUsername);
+    checkAchievements({ duelWins: wins, duelWinStreak: winStreak, duelMargin: maxMargin });
   }
 
   // ---------------- direct duel requests (no link needed) ----------------
@@ -7091,6 +7100,7 @@
       await syncStreakFromServer();
       await checkAndShowDuelNotifications();
       await checkIncomingDuelRequests();
+      await checkDuelAchievements();
       status.textContent = 'Signed in — stats sync automatically.';
       status.className = 'sync-result show success';
     } catch (e) {
@@ -7154,6 +7164,7 @@
       await syncStreakFromServer();
       await checkAndShowDuelNotifications();
       await checkIncomingDuelRequests();
+      await checkDuelAchievements();
       status.textContent = 'All synced!';
       status.className = 'sync-result show success';
     } catch (e) {
@@ -7338,6 +7349,7 @@
       await syncStreakFromServer();
       await checkAndShowDuelNotifications();
       await checkIncomingDuelRequests();
+      await checkDuelAchievements();
     }).catch(() => {});
   }
 
@@ -10793,6 +10805,14 @@ Rules:
       container.innerHTML = `<div class="duels-empty">No duels yet — challenge a friend from your results screen to start a head-to-head record.</div>`;
       return;
     }
+    // Re-check duel achievements against this same fetch — opening this
+    // tab is a natural, low-friction moment to catch up on anything that
+    // couldn't be attributed correctly before (e.g. a matching-logic fix
+    // landing after the duel itself happened), without needing a brand
+    // new duel to trigger a fresh check.
+    const { wins, winStreak, maxMargin } = computeDuelStatsFromHistory(rows, currentUsername);
+    checkAchievements({ duelWins: wins, duelWinStreak: winStreak, duelMargin: maxMargin });
+
     const records = aggregateDuelRecords(rows, currentUsername);
     const sorted = [...records.entries()].sort((a, b) => new Date(b[1].lastPlayed) - new Date(a[1].lastPlayed));
     container.innerHTML = sorted.map(([name, rec]) => `
@@ -10882,13 +10902,14 @@ Rules:
 
   async function renderAchievementsTab() {
     const container = document.getElementById('achievementsContent');
-    const state = loadAchievementState();
+    let state = loadAchievementState();
     const ctx = buildTestAchievementContext();
     // Duel progress needs a live fetch (see below) — start at 0 so the bars
     // don't briefly show stale or wrong progress, then get corrected once
-    // the fetch resolves. This function only ever READS unlock state; it
-    // never calls checkAchievements() itself, so simply viewing this tab
-    // can't accidentally unlock anything.
+    // the fetch resolves. The initial draw() below only reads unlock
+    // state; the duel re-check further down can unlock something, in
+    // which case state gets reloaded before the final draw so a newly
+    // unlocked card actually appears immediately, not after reopening.
     ctx.duelWins = 0;
     ctx.duelWinStreak = 0;
 
@@ -10949,10 +10970,18 @@ Rules:
     if (currentUsername) {
       try {
         const rows = await fetchDuelHistory();
-        const { wins, winStreak } = computeDuelStatsFromHistory(rows, currentUsername);
+        const { wins, winStreak, maxMargin } = computeDuelStatsFromHistory(rows, currentUsername);
         ctx.duelWins = wins;
         ctx.duelWinStreak = winStreak;
-        draw(); // re-render with accurate duel progress now that it's in
+        // This is the exact screen someone opens to check their unlock
+        // status, so it's the most valuable place to retroactively catch
+        // up anything that couldn't be attributed correctly before —
+        // reload state after (checkAchievements saves its own internally-
+        // loaded copy, so the outer `state` closure would otherwise still
+        // be the stale pre-check version) and redraw with it.
+        checkAchievements({ duelWins: wins, duelWinStreak: winStreak, duelMargin: maxMargin });
+        state = loadAchievementState();
+        draw();
       } catch { /* leave duel progress at 0 rather than break the tab */ }
     }
   }
