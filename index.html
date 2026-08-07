@@ -6376,11 +6376,28 @@
   // have been anonymous — name is the only thing guaranteed present on
   // both sides of every duel.
   async function fetchDuelHistory() {
-    if (!currentUsername) return [];
+    if (!currentUsername && !authSession) return [];
     try {
-      const name = encodeURIComponent(currentUsername);
+      // Matching by user_id is the real fix here — it's set once from
+      // authSession.user.id when a duel is recorded and never changes,
+      // unlike the display name, which can. Querying by name alone meant
+      // a row recorded with a name that doesn't exactly match the CURRENT
+      // currentUsername (e.g. if it hadn't fully loaded yet at the exact
+      // moment a duel completed) would be invisible to this query forever,
+      // even though the win genuinely happened — the row simply wouldn't
+      // match the filter at the database level. Name is kept as an
+      // additional OR condition only to still catch older rows or an
+      // opponent who wasn't signed in when a duel involving them ran.
+      const conditions = [];
+      if (authSession) {
+        conditions.push(`creator_user_id.eq.${authSession.user.id}`, `acceptor_user_id.eq.${authSession.user.id}`);
+      }
+      if (currentUsername) {
+        const name = encodeURIComponent(currentUsername);
+        conditions.push(`creator_name.eq.${name}`, `acceptor_name.eq.${name}`);
+      }
       const res = await fetch(
-        `${DUEL_RESULTS_ENDPOINT}?or=(creator_name.eq.${name},acceptor_name.eq.${name})&select=creator_name,creator_wpm,acceptor_name,acceptor_wpm,outcome,mode,val,completed_at&order=completed_at.desc&limit=300`,
+        `${DUEL_RESULTS_ENDPOINT}?or=(${conditions.join(',')})&select=creator_user_id,creator_name,creator_wpm,acceptor_user_id,acceptor_name,acceptor_wpm,outcome,mode,val,completed_at&order=completed_at.desc&limit=300`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
       );
       if (!res.ok) return [];
@@ -6388,10 +6405,27 @@
     } catch { return []; }
   }
 
+  // Determines "am I the creator of this duel row" preferring the stable
+  // user_id over the display name — a row can now be fetched via an
+  // ID match even when its recorded name doesn't match the CURRENT
+  // currentUsername (see fetchDuelHistory's comment), so attribution has
+  // to check ID first or it'd silently misattribute exactly those rows.
+  // Falls back to name matching only when there's no signed-in user_id to
+  // compare against (shouldn't normally happen here, since only signed-in
+  // users reach this code, but kept for safety).
+  function amICreator(r, myUserId, myName) {
+    if (myUserId) {
+      if (r.creator_user_id === myUserId) return true;
+      if (r.acceptor_user_id === myUserId) return false;
+    }
+    return r.creator_name === myName;
+  }
+
   function aggregateDuelRecords(rows, myName) {
+    const myUserId = authSession ? authSession.user.id : null;
     const records = new Map(); // opponent name -> { wins, losses, ties, lastPlayed }
     rows.forEach(r => {
-      const iAmCreator = r.creator_name === myName;
+      const iAmCreator = amICreator(r, myUserId, myName);
       const opponent = iAmCreator ? r.acceptor_name : r.creator_name;
       if (!opponent || opponent === myName) return; // skip malformed/self rows
       if (!records.has(opponent)) records.set(opponent, { wins: 0, losses: 0, ties: 0, lastPlayed: r.completed_at });
@@ -6412,11 +6446,12 @@
   // nor breaks it, matching the same rule used when these were local
   // counters; only an outright loss ends the current streak.
   function computeDuelStatsFromHistory(rows, myName) {
+    const myUserId = authSession ? authSession.user.id : null;
     let wins = 0;
     let winStreak = 0;
     let streakActive = true; // becomes false once a loss is hit, walking newest -> oldest
     rows.forEach(r => {
-      const iAmCreator = r.creator_name === myName;
+      const iAmCreator = amICreator(r, myUserId, myName);
       const won  = (iAmCreator && r.outcome === 'creator_win')  || (!iAmCreator && r.outcome === 'acceptor_win');
       const lost = (iAmCreator && r.outcome === 'acceptor_win') || (!iAmCreator && r.outcome === 'creator_win');
       if (won) {
